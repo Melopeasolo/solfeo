@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solfeo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --ink: #1a1208;
+    --paper: #1aab96;
+    --paper2: #159e8a;
+    --accent: #8b2e0a;
+    --accent2: #2e5c8b;
+    --line: #c8b98a;
+    --correct: #2e6b3e;
+    --wrong: #8b1a1a;
+    --staff-line: #4a3c22;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Libre Baskerville', serif;
+    min-height: 100vh;
+    padding: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0,80,70,0.12) 27px, rgba(0,80,70,0.12) 28px),
+      radial-gradient(ellipse at 20% 0%, rgba(0,120,100,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(0,100,80,0.12) 0%, transparent 50%);
+  }
+
+  header {
+    border-bottom: 2px solid var(--ink);
+    padding: 1.4rem 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--paper2);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  header h1 {
+    font-size: 1.7rem;
+    letter-spacing: -0.02em;
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  header span {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    padding-top: 0.2rem;
+  }
+
+  .score-bar {
+    margin-left: auto;
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+  }
+
+  .score-bar .stat { display: flex; flex-direction: column; align-items: center; }
+  .score-bar .val { font-size: 1.3rem; font-weight: 700; line-height: 1; }
+  .score-bar .lbl { font-size: 0.6rem; opacity: 0.5; letter-spacing: 0.1em; text-transform: uppercase; }
+  .score-bar .val.green { color: var(--correct); }
+  .score-bar .val.red { color: var(--wrong); }
+
+  main {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  .mode-tabs {
+    display: flex;
+    gap: 0;
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    background: white;
+  }
+
+  .mode-tabs button {
+    flex: 1;
+    padding: 0.6rem 0.5rem;
+    background: none;
+    border: none;
+    border-right: 1.5px solid var(--ink);
+    cursor: pointer;
+    color: var(--ink);
+    opacity: 1;
+    transition: all 0.15s;
+    font-family: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+    font-weight: 700;
+  }
+
+  .mode-tabs button:last-child { border-right: none; }
+  .mode-tabs button.active {
+    background: var(--ink);
+    color: var(--paper);
+    opacity: 1;
+  }
+  .mode-tabs button:hover:not(.active) { opacity: 0.75; background: #f0f0f0; }
+
+  .exercise-card {
+    background: white;
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    padding: 2rem 1.8rem 1.8rem;
+    box-shadow: 4px 4px 0 var(--ink);
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .instruction {
+    font-size: 0.78rem;
+    font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 1;
+    margin-bottom: 1.2rem;
+  }
+
+  /* SVG staff */
+  .staff-container {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0 1.5rem;
+  }
+
+  svg.staff { overflow: visible; }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .opt-btn {
+    padding: 0.7rem 0.4rem;
+    border: 1.5px solid var(--ink);
+    background: none;
+    cursor: pointer;
+    font-family: 'Libre Baskerville', serif;
+    font-size: 1rem;
+    color: var(--ink);
+    border-radius: 2px;
+    transition: all 0.12s;
+    position: relative;
+  }
+
+  .opt-btn:hover:not(:disabled) {
+    background: var(--paper2);
+    transform: translateY(-1px);
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+
+  .opt-btn.correct {
+    background: var(--correct);
+    border-color: var(--correct);
+    color: white;
+    box-shadow: 2px 2px 0 #1a4025;
+  }
+
+  .opt-btn.wrong {
+    background: var(--wrong);
+    border-color: var(--wrong);
+    color: white;
+  }
+
+  .opt-btn:disabled { cursor: default; }
+
+  .feedback {
+    text-align: center;
+    font-size: 0.9rem;
+    min-height: 1.4rem;
+    margin-top: 1rem;
+    font-style: italic;
+    transition: opacity 0.2s;
+  }
+  .feedback.ok { color: var(--correct); font-weight: 700; }
+  .feedback.fail { color: var(--wrong); }
+
+  .next-btn {
+    display: block;
+    margin: 1.2rem auto 0;
+    padding: 0.65rem 2.5rem;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    box-shadow: 3px 3px 0 var(--accent);
+    transition: all 0.12s;
+  }
+  .next-btn:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--accent); }
+  .next-btn:active { transform: translate(1px,1px); box-shadow: 2px 2px 0 var(--accent); }
+
+  /* Ledger-line exercise */
+  .interval-display {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    align-items: flex-end;
+    margin: 1rem 0 1.5rem;
+  }
+
+  /* Rhythm mode */
+  .rhythm-display {
+    font-size: 3.5rem;
+    text-align: center;
+    letter-spacing: 0.3em;
+    margin: 0.5rem 0 1.5rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--line);
+    line-height: 1;
+    min-height: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3em;
+  }
+
+  .progress-bar-wrap {
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+    border-radius: 2px;
+  }
+  .progress-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    opacity: 0.4;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .play-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    margin: 0 auto 1rem;
+    padding: 0.5rem 1.4rem;
+    background: var(--accent2);
+    color: white;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow: 2px 2px 0 #1a3a5c;
+    transition: all 0.12s;
+  }
+  .play-btn:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 #1a3a5c; }
+  .play-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 #1a3a5c; }
+
+  .clef-badge {
+    position: absolute;
+    top: 0.9rem;
+    right: 1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.3;
+  }
+  /* ocultar barra de tiiny.host */
+  #tiiny-bar, .tiiny-bar, [id*="tiiny"], [class*="tiiny"],
+  iframe[src*="tiiny"], div[style*="tiiny"] {
+    display: none !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* ── Ritmo / Entonación / Dictado ── */
+  .solfeo-card {
+    background: white;
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    padding: 2rem 1.8rem 1.8rem;
+    box-shadow: 4px 4px 0 var(--ink);
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+  .solfeo-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 0.55;
+    margin-bottom: 1.2rem;
+  }
+  .tempo-row { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; font-family:'Space Mono',monospace; font-size:0.78rem; }
+  .tempo-row label { opacity:0.6; white-space:nowrap; }
+  .tempo-val { font-weight:700; min-width:5rem; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+
+  .pulse-grid { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin:1.2rem 0; }
+  .pulse-dot { width:18px; height:18px; border-radius:50%; background:rgba(26,18,8,0.08); border:1.5px solid rgba(26,18,8,0.15); transition:all 0.06s; }
+
+  .solfeo-choices { display:flex; gap:0.4rem; flex-wrap:nowrap; margin-top:1rem; }
+  .solfeo-choice-btn {
+    flex:1;
+    padding:0.6rem 0.3rem;
+    border:1.5px solid var(--ink);
+    background:none;
+    cursor:pointer;
+    font-family:'Libre Baskerville',serif;
+    font-size:0.82rem;
+    color:var(--ink);
+    border-radius:2px;
+    transition:all 0.12s;
+    text-align:center;
+    white-space:nowrap;
+  }
+  .solfeo-choice-btn:hover:not(:disabled) { background:var(--paper2); }
+  .solfeo-choice-btn.correct { background:var(--correct); border-color:var(--correct); color:white; }
+  .solfeo-choice-btn.wrong   { background:var(--wrong);   border-color:var(--wrong);   color:white; }
+
+  .big-note-display {
+    text-align:center;
+    padding:2rem 1rem;
+    background:white;
+    border:1.5px solid var(--ink);
+    border-radius:2px;
+    margin-bottom:1.2rem;
+  }
+  .big-note-display .note-name { font-size:4rem; font-style:italic; color:var(--accent); line-height:1; font-family:'Libre Baskerville',serif; }
+  .big-note-display .note-hint { font-family:'Space Mono',monospace; font-size:0.72rem; opacity:0.55; margin-top:0.4rem; }
+
+  .level-row { display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1rem; }
+  .level-btn { padding:0.35rem 0.9rem; border:1.5px solid var(--ink); border-radius:2px; font-family:'Space Mono',monospace; font-size:0.65rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; background:none; color:var(--ink); transition:all 0.12s; }
+  .level-btn.active { background:var(--ink); color:var(--paper); }
+
+  .melody-slots { display:flex; gap:0.5rem; flex-wrap:wrap; margin:0.8rem 0; min-height:3.5rem; align-items:center; }
+  .note-slot {
+    width:3.5rem; height:3.5rem; border-radius:2px; border:1.5px dashed var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Libre Baskerville',serif; font-size:1rem; color:var(--ink); transition:all 0.15s;
+  }
+  .note-slot.active-slot { border-style:solid; border-color:var(--accent); border-width:2px; }
+  .note-slot.filled      { border-style:solid; border-color:var(--accent2); color:var(--accent2); background:rgba(46,92,139,0.07); }
+  .note-slot.correct-slot{ border-color:var(--correct); color:var(--correct); background:rgba(46,107,62,0.1); border-style:solid; }
+  .note-slot.wrong-slot  { border-color:var(--wrong);   color:var(--wrong);   background:rgba(139,26,26,0.08); border-style:solid; }
+
+  .kbd { display:flex; gap:0.4rem; flex-wrap:wrap; margin:0.8rem 0; }
+  .kbd-btn { padding:0.55rem 0.9rem; border:1.5px solid var(--ink); border-radius:2px; font-family:'Libre Baskerville',serif; font-size:0.95rem; cursor:pointer; background:none; color:var(--ink); transition:all 0.12s; }
+  .kbd-btn:hover { background:var(--paper2); }
+
+  .progress-dots { display:flex; gap:0.5rem; margin-bottom:0.8rem; align-items:center; }
+  .prog-dot { width:10px; height:10px; border-radius:50%; background:var(--line); transition:all 0.2s; }
+  .prog-dot.done-ok   { background:var(--correct); }
+  .prog-dot.done-fail { background:var(--wrong); }
+  .prog-dot.current   { background:var(--accent); }
+
+  .hint-box-solfeo { font-family:'Space Mono',monospace; font-size:0.7rem; line-height:1.7; padding:0.8rem 1rem; background:var(--paper2); border:1.5px solid var(--line); border-radius:2px; opacity:0.75; }
+  .hint-box-solfeo strong { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;flex-direction:column;align-items:center;margin-right:1.2rem;line-height:1;">
+    <span style="font-size:2.8rem;line-height:1;font-family:serif;color:var(--accent);">𝄞</span>
+    <span style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;opacity:0.5;margin-top:0.3rem;text-align:center;">Agustín Lozano</span>
+  </div>
+  <span>Lenguaje Musical 1</span>
+</header>
+
+<main>
+  <div class="mode-tabs">
+    <button class="active" onclick="setMode('notas')">Notas</button>
+    <button onclick="setMode('entonacion')">Entonación</button>
+    <button onclick="setMode('dictado')">Dictado</button>
+    <button onclick="setMode('ritmo')">Ritmo</button>
+    <button onclick="setMode('intervalos')">Intervalos</button>
+    <button onclick="setMode('figuras')">Lectura</button>
+  </div>
+
+  <div id="exerciseArea"></div>
+</main>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let mode = 'notas';
+let ok = 0, err = 0, streak = 0;
+let answered = false;
+let currentAnswer = '';
+let questionCount = 0;
+
+// ─── NOTES DATA ──────────────────────────────────────────────────────────────
+// Positions on treble clef: y offset from middle line (B4), each step = 7.5px
+// Lines (bottom to top): E4, G4, B4, D5, F5
+// Spaces: F4, A4, C5, E5
+// We'll represent positions as semitone steps above C4 for reference
+// Staff y-coordinate: pos 0 = middle line B4 = y=50; each step up = -7.5
+
+const TREBLE_NOTES = [
+  // ledger line below
+  { name:'Do', octave:4, staffPos:-2, label:'Do₄' },
+  { name:'Re', octave:4, staffPos:-1, label:'Re₄' },
+  // normal range
+  { name:'Mi', octave:4, staffPos:0,  label:'Mi₄' },
+  { name:'Fa', octave:4, staffPos:1,  label:'Fa₄' },
+  { name:'Sol', octave:4, staffPos:2, label:'Sol₄' },
+  { name:'La', octave:4, staffPos:3,  label:'La₄' },
+  { name:'Si', octave:4, staffPos:4,  label:'Si₄' },
+  { name:'Do', octave:5, staffPos:5,  label:'Do₅' },
+  { name:'Re', octave:5, staffPos:6,  label:'Re₅' },
+  { name:'Mi', octave:5, staffPos:7,  label:'Mi₅' },
+  { name:'Fa', octave:5, staffPos:8,  label:'Fa₅' },
+  { name:'Sol', octave:5, staffPos:9, label:'Sol₅' },
+  { name:'La', octave:5, staffPos:10, label:'La₅' },
+  { name:'Si', octave:5, staffPos:11, label:'Si₅' },
+  { name:'Do', octave:6, staffPos:12, label:'Do₆' },
+];
+
+// staffPos: 0=E4(first line), 1=F4(first space), 2=G4, ...
+// y = staffTop + (4 - (pos - 0)) * step... let me recalculate cleanly
+// 5 lines: y= 20,30,40,50,60 (top to bottom = F5,D5,B4,G4,E4)
+// pos 0 = E4 = y=60, pos 1=F4=y=55... step per note = 5px
+// Actually let's do step = 6.5px, top line y=18
+
+const STAFF_TOP = 60;   // espacio para líneas adicionales agudas (Do₆) + margen para plica
+const NOTE_STEP = 6.5;  // px per diatonic step
+// line positions: E4=pos0 y=60, G4=pos2 y=47, B4=pos4 y=34, D5=pos6 y=21, F5=pos8 y=8
+// Let me fix: top line F5 at y=18, each step down = +6.5
+// F5 = diatonic pos 8 (0=E4), D5=6, B4=4, G4=2, E4=0
+// y(pos) = 18 + (8-pos)*6.5
+
+function noteY(staffPos) {
+  return STAFF_TOP + (8 - staffPos) * NOTE_STEP;
+}
+
+const ALTERATION_NOTES = [
+  { label:'Fa♯₄',  pitch:'Fa♯', pos:1,  acc:'#' },
+  { label:'Do♯₄',  pitch:'Do♯', pos:-2, acc:'#' },
+  { label:'Sol♯₄', pitch:'Sol♯',pos:2,  acc:'#' },
+  { label:'Re♯₄',  pitch:'Re♯', pos:-1, acc:'#' },
+  { label:'Si♭₄',  pitch:'Si♭', pos:4,  acc:'b' },
+  { label:'Mi♭₄',  pitch:'Mi♭', pos:0,  acc:'b' },
+  { label:'La♭₄',  pitch:'La♭', pos:3,  acc:'b' },
+  { label:'Fa♯₅',  pitch:'Fa♯', pos:8,  acc:'#' },
+  { label:'Si♭₄',  pitch:'Si♭', pos:4,  acc:'b' },
+];
+
+const RHYTHM_FIGURES = [
+  { svg: '𝅝', name: 'Redonda', value: 4, html: '&#119133;' },
+  { svg: '𝅗𝅥', name: 'Blanca', value: 2, html: '&#119134;' },
+  { svg: '♩', name: 'Negra', value: 1, html: '&#9833;' },
+  { svg: '♪', name: 'Corchea', value: 0.5, html: '&#9834;' },
+  { svg: '𝅘𝅥𝅮', name: 'Semicorchea', value: 0.25, html: '&#119136;' },
+];
+
+// ─── INTERVALOS CON CALIDAD ───────────────────────────────────────────────────
+// Cada nota tiene: pos (staffPos diatónico), semis (semitonos desde Do₄), acc (alteración)
+const INTERVAL_NOTES = [
+  { label:'Do₄',   pos:-2, semis:0,  acc:null },
+  { label:'Re♭₄',  pos:-1, semis:1,  acc:'b'  },
+  { label:'Re₄',   pos:-1, semis:2,  acc:null },
+  { label:'Mi♭₄',  pos:0,  semis:3,  acc:'b'  },
+  { label:'Mi₄',   pos:0,  semis:4,  acc:null },
+  { label:'Fa₄',   pos:1,  semis:5,  acc:null },
+  { label:'Fa♯₄',  pos:1,  semis:6,  acc:'#'  },
+  { label:'Sol₄',  pos:2,  semis:7,  acc:null },
+  { label:'Sol♯₄', pos:2,  semis:8,  acc:'#'  },
+  { label:'La♭₄',  pos:3,  semis:8,  acc:'b'  },
+  { label:'La₄',   pos:3,  semis:9,  acc:null },
+  { label:'Si♭₄',  pos:4,  semis:10, acc:'b'  },
+  { label:'Si₄',   pos:4,  semis:11, acc:null },
+  { label:'Do₅',   pos:5,  semis:12, acc:null },
+  { label:'Do♯₅',  pos:5,  semis:13, acc:'#'  },
+  { label:'Re₅',   pos:6,  semis:14, acc:null },
+  { label:'Mi♭₅',  pos:7,  semis:15, acc:'b'  },
+  { label:'Mi₅',   pos:7,  semis:16, acc:null },
+  { label:'Fa₅',   pos:8,  semis:17, acc:null },
+  { label:'Fa♯₅',  pos:8,  semis:18, acc:'#'  },
+  { label:'Sol₅',  pos:9,  semis:19, acc:null },
+  { label:'La♭₅',  pos:10, semis:20, acc:'b'  },
+  { label:'La₅',   pos:10, semis:21, acc:null },
+  { label:'Si♭₅',  pos:11, semis:22, acc:'b'  },
+  { label:'Si₅',   pos:11, semis:23, acc:null },
+  { label:'Do₆',   pos:12, semis:24, acc:null },
+];
+
+// [pasos diatónicos, semitonos] → nombre del intervalo
+const INTERVAL_TABLE = {
+  '0,0':  'Unísono justo',
+  '0,1':  'Unísono aumentado',
+  '1,0':  'Segunda disminuida',
+  '1,1':  'Segunda menor',
+  '1,2':  'Segunda mayor',
+  '1,3':  'Segunda aumentada',
+  '2,2':  'Tercera disminuida',
+  '2,3':  'Tercera menor',
+  '2,4':  'Tercera mayor',
+  '2,5':  'Tercera aumentada',
+  '3,4':  'Cuarta disminuida',
+  '3,5':  'Cuarta justa',
+  '3,6':  'Cuarta aumentada',
+  '4,6':  'Quinta disminuida',
+  '4,7':  'Quinta justa',
+  '4,8':  'Quinta aumentada',
+  '5,7':  'Sexta disminuida',
+  '5,8':  'Sexta menor',
+  '5,9':  'Sexta mayor',
+  '5,10': 'Sexta aumentada',
+  '6,9':  'Séptima disminuida',
+  '6,10': 'Séptima menor',
+  '6,11': 'Séptima mayor',
+  '7,12': 'Octava justa',
+};
+
+function getIntervalName(n1, n2) {
+  const dPos  = Math.abs(n1.pos  - n2.pos);
+  const dSemi = Math.abs(n1.semis - n2.semis);
+  return INTERVAL_TABLE[`${dPos},${dSemi}`] || null;
+}
+
+function generateIntervalPair() {
+  let n1, n2, name, attempts = 0;
+  do {
+    n1 = INTERVAL_NOTES[Math.floor(Math.random() * INTERVAL_NOTES.length)];
+    n2 = INTERVAL_NOTES[Math.floor(Math.random() * INTERVAL_NOTES.length)];
+    name = getIntervalName(n1, n2);
+    attempts++;
+  } while ((!name || n1 === n2 || n1.pos === n2.pos) && attempts < 300);
+  return { n1, n2, name };
+}
+
+// ─── DRAW STAFF ──────────────────────────────────────────────────────────────
+function drawStaff(svgEl, notePos, accidental = null, showLedger = true) {
+  const W = 220, H = 160;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('width', W);
+  svgEl.setAttribute('height', H);
+  svgEl.innerHTML = '';
+
+  const lineColor = '#4a3c22';
+  const noteR = 5.5;
+  const noteX = 130;
+
+  // Draw 5 staff lines
+  for (let i = 0; i < 5; i++) {
+    const y = STAFF_TOP + i * NOTE_STEP * 2;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', 20); line.setAttribute('x2', W - 20);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', lineColor);
+    line.setAttribute('stroke-width', '1.2');
+    svgEl.appendChild(line);
+  }
+
+  // Treble clef (simplified using text)
+  const clef = document.createElementNS('http://www.w3.org/2000/svg','text');
+  clef.setAttribute('x', 25);
+  clef.setAttribute('y', STAFF_TOP + NOTE_STEP * 6 + 4);
+  clef.setAttribute('font-size', '52');
+  clef.setAttribute('fill', lineColor);
+  clef.setAttribute('font-family', 'serif');
+  clef.textContent = '𝄞';
+  svgEl.appendChild(clef);
+
+  // Ledger lines if needed
+  const y = noteY(notePos);
+  if (showLedger) {
+    // below staff: notePos < 0
+    // Lines are on even positions: -2 (Do4)
+    if (notePos <= -2) {
+      for (let lp = -2; lp >= notePos; lp -= 2) {
+        const ly = noteY(lp);
+        const ll = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ll.setAttribute('x1', noteX - 11); ll.setAttribute('x2', noteX + 11);
+        ll.setAttribute('y1', ly); ll.setAttribute('y2', ly);
+        ll.setAttribute('stroke', lineColor); ll.setAttribute('stroke-width', '1.2');
+        svgEl.appendChild(ll);
+      }
+    }
+    // above staff: notePos > 8 (Fa5=8 is top line)
+    // Sol5=9 (space, no ledger), La5=10 (ledger line), Si5=11 (space on ledger), Do6=12 (ledger line)
+    if (notePos >= 10) {
+      for (let lp = 10; lp <= notePos; lp += 2) {
+        const ly = noteY(lp);
+        const ll = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ll.setAttribute('x1', noteX - 11); ll.setAttribute('x2', noteX + 11);
+        ll.setAttribute('y1', ly); ll.setAttribute('y2', ly);
+        ll.setAttribute('stroke', lineColor); ll.setAttribute('stroke-width', '1.2');
+        svgEl.appendChild(ll);
+      }
+    }
+  }
+
+  // Accidental
+  if (accidental) {
+    const accText = document.createElementNS('http://www.w3.org/2000/svg','text');
+    accText.setAttribute('x', noteX - 14);
+    accText.setAttribute('y', y + 4);
+    accText.setAttribute('font-size', accidental === '#' ? '13' : '16');
+    accText.setAttribute('fill', '#8b2e0a');
+    accText.setAttribute('font-family', 'serif');
+    accText.setAttribute('text-anchor', 'middle');
+    accText.textContent = accidental === '#' ? '♯' : '♭';
+    svgEl.appendChild(accText);
+  }
+
+  // Notehead (filled)
+  const ellipse = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+  ellipse.setAttribute('cx', noteX);
+  ellipse.setAttribute('cy', y);
+  ellipse.setAttribute('rx', noteR);
+  ellipse.setAttribute('ry', noteR * 0.72);
+  ellipse.setAttribute('fill', '#1a1208');
+  ellipse.setAttribute('transform', `rotate(-15, ${noteX}, ${y})`);
+  svgEl.appendChild(ellipse);
+
+  // Stem
+  const stemDir = notePos > 4 ? -1 : 1; // arriba si por encima de 3ra línea, abajo si en o debajo
+  const stemX = stemDir === -1 ? noteX + noteR - 0.5 : noteX - noteR + 0.5;
+  const stemY1 = y;
+  const stemY2 = y + stemDir * 30;
+  const stem = document.createElementNS('http://www.w3.org/2000/svg','line');
+  stem.setAttribute('x1', stemX); stem.setAttribute('x2', stemX);
+  stem.setAttribute('y1', stemY1); stem.setAttribute('y2', stemY2);
+  stem.setAttribute('stroke', '#1a1208'); stem.setAttribute('stroke-width', '1.3');
+  svgEl.appendChild(stem);
+
+  return svgEl;
+}
+
+// ─── SHUFFLE / PICK ───────────────────────────────────────────────────────────
+function pick(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
+
+function pickExcluding(arr, exclude, n) {
+  const others = arr.filter(x => x !== exclude).sort(() => Math.random() - 0.5);
+  return others.slice(0, n);
+}
+
+function drawTwoNotes(svgEl, lo, hi) {
+  const W = 300, H = 170;
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.setAttribute('height', H);
+  svgEl.style.maxWidth = W + 'px';
+  svgEl.innerHTML = '';
+
+  const lineColor = '#4a3c22';
+  const noteR = 5.5;
+  const note1X = 155, note2X = 230;
+
+  // 5 staff lines
+  for (let i = 0; i < 5; i++) {
+    const y = STAFF_TOP + i * NOTE_STEP * 2;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', 20); line.setAttribute('x2', W - 10);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', lineColor); line.setAttribute('stroke-width', '1.2');
+    svgEl.appendChild(line);
+  }
+
+  // Treble clef
+  const clef = document.createElementNS('http://www.w3.org/2000/svg','text');
+  clef.setAttribute('x', 25);
+  clef.setAttribute('y', STAFF_TOP + NOTE_STEP * 6 + 4);
+  clef.setAttribute('font-size', '52');
+  clef.setAttribute('fill', lineColor);
+  clef.setAttribute('font-family', 'serif');
+  clef.textContent = '𝄞';
+  svgEl.appendChild(clef);
+
+  // Draw each note
+  [[lo, note1X], [hi, note2X]].forEach(([note, nx]) => {
+    const pos = note.pos;
+    const y = noteY(pos);
+
+    // Ledger lines below staff
+    if (pos <= -2) {
+      for (let lp = -2; lp >= pos; lp -= 2) {
+        const ly = noteY(lp);
+        const ll = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ll.setAttribute('x1', nx-11); ll.setAttribute('x2', nx+11);
+        ll.setAttribute('y1', ly); ll.setAttribute('y2', ly);
+        ll.setAttribute('stroke', lineColor); ll.setAttribute('stroke-width', '1.2');
+        svgEl.appendChild(ll);
+      }
+    }
+    // Ledger lines above staff
+    if (pos >= 10) {
+      for (let lp = 10; lp <= pos; lp += 2) {
+        const ly = noteY(lp);
+        const ll = document.createElementNS('http://www.w3.org/2000/svg','line');
+        ll.setAttribute('x1', nx-11); ll.setAttribute('x2', nx+11);
+        ll.setAttribute('y1', ly); ll.setAttribute('y2', ly);
+        ll.setAttribute('stroke', lineColor); ll.setAttribute('stroke-width', '1.2');
+        svgEl.appendChild(ll);
+      }
+    }
+
+    // Accidental
+    if (note.acc) {
+      const accText = document.createElementNS('http://www.w3.org/2000/svg','text');
+      accText.setAttribute('x', nx - 13);
+      accText.setAttribute('y', y + 4);
+      accText.setAttribute('font-size', note.acc === '#' ? '13' : '16');
+      accText.setAttribute('fill', '#8b2e0a');
+      accText.setAttribute('font-family', 'serif');
+      accText.setAttribute('text-anchor', 'middle');
+      accText.textContent = note.acc === '#' ? '♯' : '♭';
+      svgEl.appendChild(accText);
+    }
+
+    // Notehead
+    const ellipse = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+    ellipse.setAttribute('cx', nx); ellipse.setAttribute('cy', y);
+    ellipse.setAttribute('rx', noteR); ellipse.setAttribute('ry', noteR * 0.72);
+    ellipse.setAttribute('fill', '#1a1208');
+    ellipse.setAttribute('transform', `rotate(-15, ${nx}, ${y})`);
+    svgEl.appendChild(ellipse);
+
+    // Stem
+    const sd = pos > 4 ? -1 : 1;
+    const stemX = sd === -1 ? nx + noteR - 0.5 : nx - noteR + 0.5;
+    const stem = document.createElementNS('http://www.w3.org/2000/svg','line');
+    stem.setAttribute('x1', stemX); stem.setAttribute('x2', stemX);
+    stem.setAttribute('y1', y); stem.setAttribute('y2', y + sd * 30);
+    stem.setAttribute('stroke', '#1a1208'); stem.setAttribute('stroke-width', '1.3');
+    svgEl.appendChild(stem);
+  });
+}
+
+
+function setMode(m) {
+  mode = m;
+  const modeList = ['notas','entonacion','dictado','ritmo','intervalos','figuras'];
+  document.querySelectorAll('.mode-tabs button').forEach((b,i) => {
+    b.classList.toggle('active', modeList[i] === m);
+  });
+  ok=0; err=0; streak=0; questionCount=0;
+  updateScore();
+  render();
+}
+
+function updateScore() {
+  const elOk = document.getElementById('scoreOk');
+  const elErr = document.getElementById('scoreErr');
+  const elStreak = document.getElementById('scoreStreak');
+  if (elOk) elOk.textContent = ok;
+  if (elErr) elErr.textContent = err;
+  if (elStreak) elStreak.textContent = streak;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  if (mode === 'notas') renderNotas();
+  else if (mode === 'alteraciones') renderAlteraciones();
+  else if (mode === 'figuras') renderFiguras();
+  else if (mode === 'ritmo') renderRitmo();
+  else if (mode === 'entonacion') renderEntonacion();
+  else if (mode === 'dictado') renderDictado();
+  else renderIntervalos();
+}
+
+function renderNotas() {
+  questionCount++;
+  answered = false;
+  const pool = questionCount <= 8 ? TREBLE_NOTES.filter(n => n.staffPos >= 0 && n.staffPos <= 8) : TREBLE_NOTES;
+  const idx = Math.floor(Math.random() * pool.length);
+  const note = pool[idx];
+  currentAnswer = note.label;
+
+  // Pick 3 closest notes by index distance as distractors
+  const others = pool
+    .map((n, i) => ({ n, dist: Math.abs(i - idx) }))
+    .filter(x => x.n.label !== note.label)
+    .sort((a, b) => a.dist - b.dist);
+
+  const wrongs = others.slice(0, 3).map(x => x.n);
+  const options = [note, ...wrongs].sort(() => Math.random() - 0.5);
+  const progress = Math.min(questionCount / pool.length, 1);
+
+  initSampler();
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="exercise-card">
+      <div class="clef-badge">Clave de Sol</div>
+      <div class="instruction">¿Qué nota es esta?</div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${progress*100}%"></div></div>
+      <div class="staff-container">
+        <svg class="staff" id="staffSvg"></svg>
+      </div>
+      <button class="play-btn" onclick="playNote('${note.label}')">▶ Escuchar</button>
+      <div class="options-grid">
+        ${options.map((o, i) => `<button class="opt-btn" data-label="${o.label}" data-correct="${note.label}" onclick="checkAnswerBtn(this)">${o.label}</button>`).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  `;
+  drawStaff(document.getElementById('staffSvg'), note.staffPos);
+}
+
+function renderAlteraciones() {
+  questionCount++;
+  answered = false;
+  const note = ALTERATION_NOTES[Math.floor(Math.random() * ALTERATION_NOTES.length)];
+  currentAnswer = note.pitch;
+
+  const allPitches = [...new Set(ALTERATION_NOTES.map(n=>n.pitch))];
+  const wrongs = pick(allPitches.filter(p => p !== note.pitch), 3);
+  const options = [note.pitch, ...wrongs].sort(() => Math.random() - 0.5);
+
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="exercise-card">
+      <div class="clef-badge">Clave de Sol</div>
+      <div class="instruction">Nota con alteración — ¿cuál es?</div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(questionCount/12,1)*100}%"></div></div>
+      <div class="staff-container">
+        <svg class="staff" id="staffSvg"></svg>
+      </div>
+      <div class="options-grid">
+        ${options.map(o => `<button class="opt-btn" onclick="checkAnswer(this,'${o}','${note.pitch}')">${o}</button>`).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  `;
+  drawStaff(document.getElementById('staffSvg'), note.pos, note.acc);
+}
+
+// ─── FIGURAS: PENTAGRAMA COMPLETO CON COMPÁS 4/4 ─────────────────────────────
+
+// Figuras disponibles con sus valores en tiempos
+const FIG_TYPES = [
+  { name:'Redonda',              value:4,    draw: drawRedonda,             rest: false },
+  { name:'Blanca',               value:2,    draw: drawBlanca,              rest: false },
+  { name:'Negra',                value:1,    draw: drawNegra,               rest: false },
+  { name:'Corchea',              value:0.5,  draw: drawCorchea,             rest: false },
+  { name:'Semicorchea',          value:0.25, draw: drawSemicorchea,         rest: false },
+  { name:'Negra con punto',      value:1.5,  draw: drawNegraPuntillo,       rest: false },
+  { name:'Blanca con punto',     value:3,    draw: drawBlancaPuntillo,      rest: false },
+  // Silencios: indices 7-11
+  { name:'Silencio de Redonda',     value:4,    draw: drawSilencioRedonda,     rest: true },
+  { name:'Silencio de Blanca',      value:2,    draw: drawSilencioBlanca,      rest: true },
+  { name:'Silencio de Negra',       value:1,    draw: drawSilencioNegra,       rest: true },
+  { name:'Silencio de Corchea',     value:0.5,  draw: drawSilencioCorchea,     rest: true },
+  { name:'Silencio de Semicorchea', value:0.25, draw: drawSilencioSemicorchea, rest: true },
+];
+
+// Notas en el pentagrama — rango extendido con líneas adicionales
+const STAFF_NOTES_FIGURAS = [
+  { label:'Do₄', pos:-2 }, { label:'Re₄', pos:-1 },
+  { label:'Mi₄', pos:0 },  { label:'Fa₄', pos:1 },  { label:'Sol₄', pos:2 },
+  { label:'La₄', pos:3 },  { label:'Si₄', pos:4 },  { label:'Do₅', pos:5 },
+  { label:'Re₅', pos:6 },  { label:'Mi₅', pos:7 },  { label:'Fa₅', pos:8 },
+  { label:'Sol₅', pos:9 }, { label:'La₅', pos:10 }, { label:'Si₅', pos:11 }, { label:'Do₆', pos:12 },
+];
+
+// Estado del ejercicio de figuras
+let currentMeasure = [];
+let currentFiguraIdx = 0;
+let currentTimeSignature = 4; // 2, 3 o 4
+
+function generateMeasure() {
+  // Índices FIG_TYPES: 0=Redonda(4), 1=Blanca(2), 2=Negra(1), 3=Corchea(0.5),
+  //                    4=Semicorchea(0.25), 5=Negra c/p.(1.5), 6=Blanca c/p.(3)
+
+  const patterns4 = [
+    // Redonda sola (4)
+    [ {fi:0} ],
+    // Dos blancas (2+2)
+    [ {fi:1}, {fi:1} ],
+    // Blanca + dos negras (2+1+1)
+    [ {fi:1}, {fi:2}, {fi:2} ],
+    // Cuatro negras (1+1+1+1)
+    [ {fi:2}, {fi:2}, {fi:2}, {fi:2} ],
+    // Dos negras + blanca (1+1+2)
+    [ {fi:2}, {fi:2}, {fi:1} ],
+    // Negra + dos corcheas + negra (1+0.5+0.5+1)
+    [ {fi:2}, {fi:3}, {fi:3}, {fi:2} ],
+    // Dos corcheas + negra + dos corcheas + negra (0.5+0.5+1+0.5+0.5+1)
+    [ {fi:3}, {fi:3}, {fi:2}, {fi:3}, {fi:3}, {fi:2} ],
+    // Ocho corcheas (0.5×8)
+    [ {fi:3},{fi:3},{fi:3},{fi:3},{fi:3},{fi:3},{fi:3},{fi:3} ],
+    // Blanca con puntillo + negra (3+1)
+    [ {fi:6}, {fi:2} ],
+    // Negra + blanca con puntillo (1+3)
+    [ {fi:2}, {fi:6} ],
+    // Negra con puntillo + corchea + negra + negra (1.5+0.5+1+1)
+    [ {fi:5}, {fi:3}, {fi:2}, {fi:2} ],
+    // Negra + negra con puntillo + corchea + negra (1+1.5+0.5+1)
+    [ {fi:2}, {fi:5}, {fi:3}, {fi:2} ],
+    // Cuatro semicorcheas + tres negras (0.25×4+1×3)
+    [ {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2},{fi:2},{fi:2} ],
+    // Negra + cuatro semicorcheas + dos negras
+    [ {fi:2}, {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2},{fi:2} ],
+    // Dos negras + cuatro semicorcheas + negra
+    [ {fi:2},{fi:2}, {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2} ],
+    // Corchea + cuatro semicorcheas + corchea + negra + negra
+    [ {fi:3}, {fi:4},{fi:4},{fi:4},{fi:4}, {fi:3}, {fi:2},{fi:2} ],
+    // Blanca + cuatro corcheas (2+2)
+    [ {fi:1}, {fi:3},{fi:3},{fi:3},{fi:3} ],
+    // Cuatro corcheas + blanca (2+2)
+    [ {fi:3},{fi:3},{fi:3},{fi:3}, {fi:1} ],
+    // Patrones con silencios
+    // Silencio de redonda (4)
+    [ {fi:7} ],
+    // Silencio de blanca + blanca (2+2)
+    [ {fi:8}, {fi:1} ],
+    // Blanca + silencio de blanca (2+2)
+    [ {fi:1}, {fi:8} ],
+    // Silencio de negra + tres negras (1+1+1+1)
+    [ {fi:9}, {fi:2}, {fi:2}, {fi:2} ],
+    // Negra + silencio de negra + dos negras (1+1+1+1)
+    [ {fi:2}, {fi:9}, {fi:2}, {fi:2} ],
+    // Dos negras + silencio de negra + negra (1+1+1+1)
+    [ {fi:2}, {fi:2}, {fi:9}, {fi:2} ],
+    // Silencio de blanca + dos negras (2+1+1)
+    [ {fi:8}, {fi:2}, {fi:2} ],
+    // Dos negras + silencio de blanca (1+1+2)
+    [ {fi:2}, {fi:2}, {fi:8} ],
+    // Negra + silencio de corchea + corchea + dos negras
+    [ {fi:2}, {fi:10}, {fi:3}, {fi:2}, {fi:2} ],
+    // Silencio de corchea + corchea + negra + negra + negra
+    [ {fi:10}, {fi:3}, {fi:2}, {fi:2}, {fi:2} ],
+    // Negra + silencio de semicorchea + semicorchea + dos corcheas + negra
+    [ {fi:2}, {fi:11}, {fi:4}, {fi:3}, {fi:3}, {fi:2} ],
+  ];
+
+  const patterns3 = [
+    // Blanca con puntillo (3)
+    [ {fi:6} ],
+    // Blanca + negra (2+1)
+    [ {fi:1}, {fi:2} ],
+    // Negra + blanca (1+2)
+    [ {fi:2}, {fi:1} ],
+    // Tres negras (1+1+1)
+    [ {fi:2}, {fi:2}, {fi:2} ],
+    // Negra + cuatro corcheas (1+2)
+    [ {fi:2}, {fi:3},{fi:3},{fi:3},{fi:3} ],
+    // Cuatro corcheas + negra (2+1)
+    [ {fi:3},{fi:3},{fi:3},{fi:3}, {fi:2} ],
+    // Seis corcheas (0.5×6)
+    [ {fi:3},{fi:3},{fi:3},{fi:3},{fi:3},{fi:3} ],
+    // Negra con puntillo + corchea + negra (1.5+0.5+1)
+    [ {fi:5}, {fi:3}, {fi:2} ],
+    // Negra + negra con puntillo + corchea (1+1.5+0.5)
+    [ {fi:2}, {fi:5}, {fi:3} ],
+    // Dos negras + dos corcheas (1+1+0.5+0.5)
+    [ {fi:2},{fi:2}, {fi:3},{fi:3} ],
+    // Dos corcheas + dos negras (0.5+0.5+1+1)
+    [ {fi:3},{fi:3}, {fi:2},{fi:2} ],
+    // Negra + dos corcheas + negra (1+0.5+0.5+1)
+    [ {fi:2}, {fi:3},{fi:3}, {fi:2} ],
+    // Cuatro semicorcheas + negra + negra (0.25×4+1+1)
+    [ {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2},{fi:2} ],
+    // Negra + cuatro semicorcheas + negra (1+1+1)
+    [ {fi:2}, {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2} ],
+    // Silencios en 3/4
+    [ {fi:9}, {fi:2}, {fi:2} ],
+    [ {fi:2}, {fi:9}, {fi:2} ],
+    [ {fi:2}, {fi:2}, {fi:9} ],
+    [ {fi:8}, {fi:2} ],
+    [ {fi:2}, {fi:8} ],
+    [ {fi:10}, {fi:3}, {fi:2}, {fi:2} ],
+    [ {fi:9}, {fi:10}, {fi:3}, {fi:2} ],
+  ];
+
+  const patterns2 = [
+    // Blanca (2)
+    [ {fi:1} ],
+    // Dos negras (1+1)
+    [ {fi:2}, {fi:2} ],
+    // Cuatro corcheas (0.5×4)
+    [ {fi:3},{fi:3},{fi:3},{fi:3} ],
+    // Negra + dos corcheas (1+0.5+0.5)
+    [ {fi:2}, {fi:3},{fi:3} ],
+    // Dos corcheas + negra (0.5+0.5+1)
+    [ {fi:3},{fi:3}, {fi:2} ],
+    // Negra con puntillo + corchea (1.5+0.5)
+    [ {fi:5}, {fi:3} ],
+    // Corchea + negra con puntillo (0.5+1.5)
+    [ {fi:3}, {fi:5} ],
+    // Cuatro semicorcheas + negra (0.25×4+1)
+    [ {fi:4},{fi:4},{fi:4},{fi:4}, {fi:2} ],
+    // Negra + cuatro semicorcheas (1+0.25×4)
+    [ {fi:2}, {fi:4},{fi:4},{fi:4},{fi:4} ],
+    // Dos corcheas + dos corcheas (4 corcheas en dos grupos)
+    [ {fi:3},{fi:3}, {fi:3},{fi:3} ],
+    // Corchea + dos semicorcheas + corchea (0.5+0.5+0.5+0.5)
+    [ {fi:3}, {fi:4},{fi:4}, {fi:3} ],
+    // Silencios en 2/4
+    [ {fi:9}, {fi:2} ],
+    [ {fi:2}, {fi:9} ],
+    [ {fi:10}, {fi:3}, {fi:2} ],
+    [ {fi:2}, {fi:10}, {fi:3} ],
+    [ {fi:9}, {fi:10}, {fi:3} ],
+  ];
+
+  const map = { 4: patterns4, 3: patterns3, 2: patterns2 };
+  const patterns = map[currentTimeSignature] || patterns4;
+  const pat = patterns[Math.floor(Math.random() * patterns.length)];
+
+  return pat.map(({fi}) => {
+    const fig = FIG_TYPES[fi];
+    const note = fig.rest ? null : STAFF_NOTES_FIGURAS[Math.floor(Math.random() * STAFF_NOTES_FIGURAS.length)];
+    return { fig, note };
+  });
+}
+
+function setTimeSignature(ts) {
+  currentTimeSignature = ts;
+  document.querySelectorAll('.ts-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.ts) === ts);
+  });
+  renderFiguras();
+}
+
+function renderFiguras() {
+  answered = true; // no hay pregunta, no se chequea nada
+
+  currentMeasure = generateMeasure();
+
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="exercise-card">
+      <div class="clef-badge">Clave de Sol · ${currentTimeSignature}/4</div>
+      <div class="instruction" style="margin-bottom:0.5rem;">Lectura de notas y silencios</div>
+      <div style="display:flex;gap:0;justify-content:center;margin-bottom:1rem;">
+        <button class="ts-btn${currentTimeSignature===2?' active':''}" data-ts="2" onclick="setTimeSignature(2)"
+          style="padding:0.35rem 1rem;border:1.5px solid var(--ink);border-right:none;background:${currentTimeSignature===2?'var(--ink)':'none'};color:${currentTimeSignature===2?'var(--paper)':'var(--ink)'};font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">2/4</button>
+        <button class="ts-btn${currentTimeSignature===3?' active':''}" data-ts="3" onclick="setTimeSignature(3)"
+          style="padding:0.35rem 1rem;border:1.5px solid var(--ink);border-right:none;background:${currentTimeSignature===3?'var(--ink)':'none'};color:${currentTimeSignature===3?'var(--paper)':'var(--ink)'};font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">3/4</button>
+        <button class="ts-btn${currentTimeSignature===4?' active':''}" data-ts="4" onclick="setTimeSignature(4)"
+          style="padding:0.35rem 1rem;border:1.5px solid var(--ink);background:${currentTimeSignature===4?'var(--ink)':'none'};color:${currentTimeSignature===4?'var(--paper)':'var(--ink)'};font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">4/4</button>
+      </div>
+      <div class="staff-container" style="overflow-x:auto; margin: 1.2rem 0 0.5rem;">
+        <svg class="staff" id="staffFiguras" style="display:block;margin:0 auto;"></svg>
+      </div>
+      <div style="text-align:center;margin-top:0.4rem;">
+        <button id="btnRevelar" class="play-btn" onclick="revelarNombres()" style="margin:0 auto 0.6rem;">
+          👁 Sonidos y notas
+        </button>
+      </div>
+      <div id="nombresFiguras" style="
+        display:none;
+        text-align:center;
+        font-family:'Space Mono',monospace;
+        font-size:0.72rem;
+        letter-spacing:0.08em;
+        opacity:0.7;
+        margin-bottom:0.8rem;
+        line-height:2;
+      "></div>
+      <button class="next-btn" onclick="renderFiguras()">Nuevo compás →</button>
+    </div>
+  `;
+
+  drawMeasureSVG(document.getElementById('staffFiguras'), currentMeasure, -1);
+}
+
+function revelarNombres() {
+  const div = document.getElementById('nombresFiguras');
+  const btn = document.getElementById('btnRevelar');
+  if (div.style.display === 'none') {
+    // Construir spans con id para poder iluminarlos
+    div.innerHTML = currentMeasure.map((m, i) =>
+      `<span id="fnota${i}" style="display:inline-block;margin:0 0.5rem;padding:0.15rem 0.4rem;border-radius:3px;transition:background 0.15s;">${m.note ? m.note.label + ' ' : ''}<span style="opacity:0.45;font-size:0.65rem;">(${m.fig.name})</span></span>`
+    ).join('');
+    div.style.display = 'block';
+    btn.textContent = '👁 Ocultar';
+    playMeasureSequence();
+  } else {
+    div.style.display = 'none';
+    btn.textContent = '👁 Sonidos y notas';
+  }
+}
+
+async function playMeasureSequence() {
+  await Tone.start();
+  if (!sampler) initSampler();
+
+  // BPM de referencia: negra = 72 → 1 tiempo = 833ms
+  const beatMs = 833;
+
+  let delay = 120; // pequeña pausa inicial
+  currentMeasure.forEach((m, i) => {
+    const durMs = m.fig.value * beatMs;
+    const noteDur = Math.min(durMs * 0.85, 2000); // duración de la nota en ms, tope en 2s
+
+    setTimeout(async () => {
+      // Iluminar el span
+      const span = document.getElementById(`fnota${i}`);
+      if (span) {
+        span.style.background = 'rgba(139,46,10,0.15)';
+        span.style.color = 'var(--accent)';
+        setTimeout(() => {
+          if (span) { span.style.background = ''; span.style.color = ''; }
+        }, durMs);
+      }
+
+      // No tocar si es silencio
+      const pitch = m.note ? NOTE_TO_PITCH[m.note.label] : null;
+      if (pitch && samplerReady) {
+        try {
+          // Convertir ms a notación de Tone.js
+          const toneDur = noteDur / 1000 + 'n' in Tone.Transport ? noteDur / 1000 : noteDur / 1000;
+          sampler.triggerAttackRelease(pitch, noteDur / 1000);
+        } catch(e) {}
+      } else if (pitch) {
+        // Sampler no listo, reintentar
+        setTimeout(() => {
+          try { sampler && sampler.triggerAttackRelease(pitch, noteDur / 1000); } catch(e) {}
+        }, 400);
+      }
+    }, delay);
+
+    delay += durMs;
+  });
+}
+
+// ─── SVG: DIBUJAR COMPÁS COMPLETO ─────────────────────────────────────────────
+
+function drawMeasureSVG(svgEl, measure, highlightIdx) {
+  const H = 170;
+  const W = Math.max(500, 92 + measure.length * 28 + 32);
+  svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svgEl.setAttribute('width', '100%');
+  svgEl.setAttribute('height', H);
+  svgEl.style.maxWidth = W + 'px';
+  svgEl.innerHTML = '';
+
+  const lineColor = '#4a3c22';
+  const ST = STAFF_TOP;   // staff top y
+  const NS = NOTE_STEP;   // 6.5px per step
+
+  // 5 líneas del pentagrama
+  for (let i = 0; i < 5; i++) {
+    const y = ST + i * NS * 2;
+    const ln = svgElem('line', { x1:15, x2:W-15, y1:y, y2:y, stroke:lineColor, 'stroke-width':'1.2' });
+    svgEl.appendChild(ln);
+  }
+
+  // Clave de Sol
+  const clef = svgElem('text', {
+    x:18, y: ST + NS*6 + 4,
+    'font-size':'52', fill:lineColor, 'font-family':'serif'
+  });
+  clef.textContent = '𝄞';
+  svgEl.appendChild(clef);
+
+  // Indicación de compás (numerador dinámico, denominador siempre 4)
+  const ts4a = svgElem('text', { x:68, y: ST + NS*2 + 3, 'font-size':'16', fill:lineColor, 'font-family':'serif', 'font-weight':'bold', 'text-anchor':'middle' });
+  ts4a.textContent = String(currentTimeSignature);
+  svgEl.appendChild(ts4a);
+  const ts4b = svgElem('text', { x:68, y: ST + NS*6 + 3, 'font-size':'16', fill:lineColor, 'font-family':'serif', 'font-weight':'bold', 'text-anchor':'middle' });
+  ts4b.textContent = '4';
+  svgEl.appendChild(ts4b);
+
+  // Barra inicial
+  const barStart = svgElem('line', { x1:80, x2:80, y1:ST, y2:ST+NS*8, stroke:lineColor, 'stroke-width':'1.5' });
+  svgEl.appendChild(barStart);
+
+  // Barra final doble
+  const barEnd1 = svgElem('line', { x1:W-20, x2:W-20, y1:ST, y2:ST+NS*8, stroke:lineColor, 'stroke-width':'1.5' });
+  svgEl.appendChild(barEnd1);
+  const barEnd2 = svgElem('line', { x1:W-15, x2:W-15, y1:ST, y2:ST+NS*8, stroke:lineColor, 'stroke-width':'3.5' });
+  svgEl.appendChild(barEnd2);
+
+  // Distribuir figuras en el pentagrama
+  const noteAreaStart = 92;
+  const noteAreaEnd = W - 32;
+  const noteAreaW = noteAreaEnd - noteAreaStart;
+
+  // Distribuir figuras con espaciado mixto: proporcional + mínimo por figura
+  // Cada figura recibe al menos MIN_SLOT px, el resto se distribuye proporcionalmente
+  const MIN_SLOT = 22; // px mínimos por figura
+  const n = measure.length;
+  const minTotal = n * MIN_SLOT;
+  const extra = Math.max(0, noteAreaW - minTotal);
+  let totalVal = measure.reduce((s, m) => s + m.fig.value, 0);
+
+  // Slot de cada figura = MIN_SLOT + proporcional al valor
+  const slots = measure.map(m => MIN_SLOT + (m.fig.value / totalVal) * extra);
+
+  const xPositions = [];
+  let xAccum = 0;
+  for (let i = 0; i < measure.length; i++) {
+    xPositions.push(noteAreaStart + xAccum);
+    xAccum += slots[i];
+  }
+  const xWidths = slots;
+
+  measure.forEach((item, idx) => {
+    const isHighlight = idx === highlightIdx;
+    const x = xPositions[idx] + xWidths[idx] * 0.4;
+    const isRest = item.fig.rest;
+    const np = isRest ? 4 : item.note.pos;
+    const y = isRest ? noteY(4) : noteY(np);
+
+    // Resaltado de fondo para la figura activa
+    if (isHighlight && highlightIdx >= 0) {
+      const hiW = xWidths[idx] - 4;
+      const hiX = xPositions[idx] + 2;
+      const hiRect = svgElem('rect', {
+        x: hiX, y: ST - 12,
+        width: hiW, height: NS * 8 + 24,
+        fill: '#8b2e0a', opacity: '0.08',
+        rx: '4'
+      });
+      svgEl.appendChild(hiRect);
+    }
+
+    // Líneas adicionales sólo para notas (no para silencios)
+    if (!isRest) {
+      if (np <= -2) {
+        for (let lp = -2; lp >= np; lp -= 2) {
+          const ly = noteY(lp);
+          svgEl.appendChild(svgElem('line', { x1:x-10, x2:x+10, y1:ly, y2:ly, stroke:lineColor, 'stroke-width':'1.2' }));
+        }
+      }
+      if (np >= 10) {
+        for (let lp = 10; lp <= np; lp += 2) {
+          const ly = noteY(lp);
+          svgEl.appendChild(svgElem('line', { x1:x-10, x2:x+10, y1:ly, y2:ly, stroke:lineColor, 'stroke-width':'1.2' }));
+        }
+      }
+    }
+
+    // Dibujar la figura
+    item.fig.draw(svgEl, x, y, np, isHighlight);
+
+    // Estrella de marcador sobre la figura activa
+    if (isHighlight && highlightIdx >= 0) {
+      const star = svgElem('text', {
+        x: x, y: y - 32,
+        'font-size': '14',
+        fill: '#8b2e0a',
+        'text-anchor': 'middle',
+        'font-weight': 'bold'
+      });
+      star.textContent = '★';
+      svgEl.appendChild(star);
+    }
+  });
+}
+
+function svgElem(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+const INK = '#1a1208';
+const NR = 5.5; // noteR
+
+// Plica: por encima de la 3ra línea (Si₄=pos4) → arriba (-1); 3ra línea o por debajo → abajo (1)
+function stemDir(np) { return np > 4 ? -1 : 1; }
+
+function drawStem(svgEl, x, y, np) {
+  const sd = stemDir(np);
+  const sx = sd === -1 ? x + NR - 0.5 : x - NR + 0.5;
+  svgEl.appendChild(svgElem('line', { x1:sx, x2:sx, y1:y, y2:y + sd * 30, stroke:INK, 'stroke-width':'1.4' }));
+  return { sx, sy2: y + sd * 30, sd };
+}
+
+function drawNoteHead(svgEl, x, y, hollow=false) {
+  const el = svgElem('ellipse', {
+    cx:x, cy:y, rx:NR, ry:NR*0.72,
+    fill: hollow ? 'none' : INK,
+    stroke: INK, 'stroke-width': hollow ? '1.4' : '0',
+    transform:`rotate(-15,${x},${y})`
+  });
+  svgEl.appendChild(el);
+}
+
+function drawRedonda(svgEl, x, y, np, hi) {
+  // Cabeza hueca sin plica, ligeramente más grande
+  const el = svgElem('ellipse', {
+    cx:x, cy:y, rx:NR+1, ry:(NR+1)*0.72,
+    fill:'none', stroke: hi ? '#8b2e0a' : INK, 'stroke-width':'1.6',
+    transform:`rotate(-15,${x},${y})`
+  });
+  // Hueco interior
+  const inner = svgElem('ellipse', {
+    cx:x, cy:y, rx:NR-2.5, ry:(NR-1.5)*0.65,
+    fill:'white',
+    transform:`rotate(-15,${x},${y})`
+  });
+  svgEl.appendChild(el);
+  svgEl.appendChild(inner);
+}
+
+function drawBlanca(svgEl, x, y, np, hi) {
+  drawNoteHead(svgEl, x, y, true);
+  if (hi) {
+    const el = svgEl.lastChild;
+    el.setAttribute('stroke', '#8b2e0a');
+  }
+  drawStem(svgEl, x, y, np);
+}
+
+function drawBlancaPuntillo(svgEl, x, y, np, hi) {
+  drawBlanca(svgEl, x, y, np, hi);
+  svgEl.appendChild(svgElem('circle', { cx:x+NR+4, cy:y-2, r:'2', fill: hi ? '#8b2e0a' : INK }));
+}
+
+function drawNegra(svgEl, x, y, np, hi) {
+  const el = svgElem('ellipse', {
+    cx:x, cy:y, rx:NR, ry:NR*0.72,
+    fill: hi ? '#8b2e0a' : INK,
+    transform:`rotate(-15,${x},${y})`
+  });
+  svgEl.appendChild(el);
+  drawStem(svgEl, x, y, np);
+}
+
+function drawNegraPuntillo(svgEl, x, y, np, hi) {
+  drawNegra(svgEl, x, y, np, hi);
+  svgEl.appendChild(svgElem('circle', { cx:x+NR+4, cy:y-2, r:'2', fill: hi ? '#8b2e0a' : INK }));
+}
+
+// Paths de glifos reales (FreeSerif), usados por corchea y semicorchea
+const NOTEHEAD_PATH = 'M35 59Q35 111 84.5 151.5Q134 192 191 192Q275 192 275 120Q275 64 226.5 27Q178 -10 119 -10Q86 -10 60.5 9.5Q35 29 35 59Z';
+const FLAG1_PATH    = 'M128 177Q133 188 144.5 212Q156 236 160 245Q164 254 171 272Q178 290 180.5 301.5Q183 313 185.5 329Q188 345 188 361Q188 428 138.5 485.5Q89 543 24 547H0V767H23Q32 709 56 663Q80 617 107.5 587.5Q135 558 161 529.5Q187 501 204.5 462.5Q222 424 222 376Q222 291 151 177Z';
+const FLAG2_PATH    = 'M222 302Q222 225 184 162H160Q195 232 195 289Q195 321 179.5 349Q164 377 132.5 400Q101 423 80.5 435Q60 447 24 465H0V767H23Q27 732 48.5 699.5Q70 667 98 640.5Q126 614 153.5 586.5Q181 559 200 522.5Q219 486 219 445Q219 411 203 376Q222 348 222 302ZM194 428Q194 531 30 620Q30 591 42 565Q54 539 74 518.5Q94 498 115 481Q136 464 158 443.5Q180 423 192 405Q194 421 194 428Z';
+// Escala unificada: notehead width=240 → rx≈5.5px
+const NOTE_S = 0.0458;
+
+function _drawNoteheadAndStem(svgEl, x, np, col, stemLen) {
+  const ny = noteY(np);
+  const sd = stemDir(np);
+  // Cabeza
+  const gh = svgElem('g', { transform:`translate(${x},${ny}) scale(${NOTE_S},${-NOTE_S}) translate(-155,-91)`, fill:col });
+  gh.appendChild(svgElem('path', { d: NOTEHEAD_PATH }));
+  svgEl.appendChild(gh);
+  // Plica
+  const sx = sd === 1 ? x + 5.5 : x - 5.5;
+  const sy2 = ny - sd * stemLen;
+  svgEl.appendChild(svgElem('line', { x1:sx, y1:ny, x2:sx, y2:sy2, stroke:col, 'stroke-width':'1.4' }));
+  return { sx, sy2, sd };
+}
+
+function _drawFlag(svgEl, sx, sy2, sd, col, flagPath) {
+  // flag_1 font: base en y=767, se extiende hacia y=177 (decrece) y hacia x=222 (derecha)
+  // sd=+1 (plica arriba, stem_end arriba en SVG):
+  //   bandera cuelga hacia ABAJO → scale(S,-S): y_font decreciente → y_svg creciente ✓
+  // sd=-1 (plica abajo, stem_end abajo en SVG):
+  //   bandera cuelga hacia ARRIBA → scale(S,+S): y_font decreciente → y_svg decreciente ✓
+  // En ambos casos x queda a la DERECHA (scale X siempre positivo)
+  const sy = sd === 1 ? -NOTE_S : NOTE_S;
+  const gf = svgElem('g', { transform:`translate(${sx},${sy2}) scale(${NOTE_S},${sy}) translate(0,-767)`, fill:col });
+  gf.appendChild(svgElem('path', { d: flagPath }));
+  svgEl.appendChild(gf);
+}
+
+function drawCorchea(svgEl, x, y, np, hi) {
+  const col = hi ? '#8b2e0a' : INK;
+  const { sx, sy2, sd } = _drawNoteheadAndStem(svgEl, x, np, col, 30);
+  _drawFlag(svgEl, sx, sy2, sd, col, FLAG1_PATH);
+}
+
+function drawSemicorchea(svgEl, x, y, np, hi) {
+  const col = hi ? '#8b2e0a' : INK;
+  const { sx, sy2, sd } = _drawNoteheadAndStem(svgEl, x, np, col, 36);
+  _drawFlag(svgEl, sx, sy2, sd, col, FLAG2_PATH);
+}
+
+// ─── SILENCIOS ────────────────────────────────────────────────────────────────
+// Los silencios se dibujan centrados en el pentagrama, sin depender de pos de nota.
+// La "y" que reciben es noteY(4) = tercera línea (Si₄), usada como referencia.
+
+function drawSilencioRedonda(svgEl, x, y, np, hi) {
+  // Silencio de redonda: rectángulo negro colgado bajo la 4ta línea
+  const col = hi ? '#8b2e0a' : INK;
+  const ry = STAFF_TOP + NOTE_STEP * 2; // y de la 4ta línea (pos 6 = Re5)
+  svgEl.appendChild(svgElem('rect', {
+    x: x - 7, y: ry,
+    width: 14, height: 5,
+    fill: col, rx: '1'
+  }));
+}
+
+function drawSilencioBlanca(svgEl, x, y, np, hi) {
+  // Silencio de blanca: rectángulo negro apoyado sobre la 3ra línea
+  const col = hi ? '#8b2e0a' : INK;
+  const ry = STAFF_TOP + NOTE_STEP * 4; // y de la 3ra línea (pos 4 = Si4)
+  svgEl.appendChild(svgElem('rect', {
+    x: x - 7, y: ry - 5,
+    width: 14, height: 5,
+    fill: col, rx: '1'
+  }));
+}
+
+function drawSilencioNegra(svgEl, x, y, np, hi) {
+  // Silencio de negra: path extraído del glifo real (FreeSerif U+1D13D),
+  // escalado a 28px de alto y centrado en la 3ra línea del pentagrama.
+  // Coordenadas de fuente con Y hacia arriba → transformación scale(s,-s) para voltear a SVG.
+  const col = hi ? '#8b2e0a' : INK;
+  const cy = STAFF_TOP + NOTE_STEP * 4; // 3ra línea (Si₄)
+  const g = svgElem('g', {
+    transform: `translate(${x}, ${cy}) scale(0.047, -0.047) translate(-159.5, -360)`,
+    fill: col
+  });
+  const p = svgElem('path', {
+    d: 'M55 208Q55 242 77.5 260Q100 278 130 278Q150 278 178 267L65 415Q145 487 145 544Q145 589 91 658H136L264 502Q181 404 181 356Q181 310 259 217L243 194Q203 217 176 217Q140 217 140 173Q140 129 179 84L165 62Q55 144 55 208Z'
+  });
+  g.appendChild(p);
+  svgEl.appendChild(g);
+}
+
+function drawSilencioCorchea(svgEl, x, y, np, hi) {
+  // Silencio de corchea: path extraído del glifo real (FreeSerif U+1D13E, eighth_rest).
+  // Bounds fuente: (19,166,234,532), h=366 → scale=0.0765 para 28px de alto.
+  const col = hi ? '#8b2e0a' : INK;
+  const cy = STAFF_TOP + NOTE_STEP * 4; // 3ra línea
+  const g = svgElem('g', {
+    transform: `translate(${x}, ${cy}) scale(0.0765, -0.0765) translate(-126.5, -349)`,
+    fill: col
+  });
+  g.appendChild(svgElem('path', {
+    d: 'M136 443Q152 443 175 466.5Q198 490 213 511H234L138 166H101L173 426Q126 402 97 402Q68 402 43.5 422.5Q19 443 19 473Q19 495 35 513.5Q51 532 79 532Q106 532 122 513.5Q138 495 138 473Q138 458 131 445Q135 443 136 443Z'
+  }));
+  svgEl.appendChild(g);
+}
+
+function drawSilencioSemicorchea(svgEl, x, y, np, hi) {
+  // Silencio de semicorchea: path extraído del glifo real (FreeSerif U+1D13F, sixteenth_rest).
+  // Bounds fuente: (19,-23,287,531), h=554 → scale=0.0650 para 36px de alto.
+  const col = hi ? '#8b2e0a' : INK;
+  const cy = STAFF_TOP + NOTE_STEP * 4; // 3ra línea
+  const g = svgElem('g', {
+    transform: `translate(${x}, ${cy}) scale(0.065, -0.065) translate(-153, -254)`,
+    fill: col
+  });
+  g.appendChild(svgElem('path', {
+    d: 'M189 443Q205 443 229 467Q253 491 265 511H287L138 -23H101L173 237Q126 213 97 213Q68 213 43.5 233.5Q19 254 19 284Q19 306 35 324.5Q51 343 79 343Q106 343 122 324.5Q138 306 138 284Q138 269 131 256Q135 254 136 254Q155 254 189 291L226 425Q181 402 149 402Q121 402 96 422Q71 442 71 472Q71 498 88.5 514.5Q106 531 130 531Q155 531 172.5 514Q190 497 190 472Q190 457 184 445Q188 443 189 443Z'
+  }));
+  svgEl.appendChild(g);
+}
+
+function renderIntervalos() {
+  questionCount++;
+  answered = false;
+
+  const { n1, n2, name } = generateIntervalPair();
+  currentAnswer = name;
+
+  // Notas en orden: grave abajo, aguda arriba
+  const lo = n1.pos <= n2.pos ? n1 : n2;
+  const hi = n1.pos <= n2.pos ? n2 : n1;
+
+  // Distractores: otros intervalos de la tabla, priorizando misma raíz (ej. Mayor/menor/justa del mismo número)
+  const allNames = [...new Set(Object.values(INTERVAL_TABLE))];
+  // Primero buscar nombres con el mismo número (ej. "Tercera")
+  const root = name.split(' ')[0];
+  const sameRoot = allNames.filter(n => n !== name && n.startsWith(root));
+  const others   = allNames.filter(n => n !== name && !n.startsWith(root));
+  const shuffled = [...sameRoot.sort(() => Math.random()-0.5), ...others.sort(() => Math.random()-0.5)];
+  const wrongs = shuffled.slice(0, 3);
+  const options = [name, ...wrongs].sort(() => Math.random() - 0.5);
+
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="exercise-card">
+      <div class="clef-badge">Intervalos</div>
+      <div class="instruction">¿Qué intervalo forman estas dos notas?</div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${Math.min(questionCount/10,1)*100}%"></div></div>
+      <div class="staff-container">
+        <svg class="staff" id="staffSvg1" style="width:100%;max-width:300px;display:block;margin:0 auto;"></svg>
+      </div>
+      <div style="text-align:center;font-size:0.75rem;opacity:0.45;margin:-0.3rem 0 1rem;font-family:'Space Mono',monospace">${lo.label} · ${hi.label}</div>
+      <div class="options-grid" id="intervalOptions" style="grid-template-columns:repeat(2,1fr);">
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  `;
+
+  // Insertar botones via JS para evitar problemas de encoding en onclick
+  const grid = document.getElementById('intervalOptions');
+  options.forEach(o => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.style.cssText = 'font-size:0.82rem;padding:0.6rem 0.3rem;';
+    btn.textContent = o;
+    btn.addEventListener('click', () => checkAnswer(btn, o, name));
+    grid.appendChild(btn);
+  });
+  drawTwoNotes(document.getElementById('staffSvg1'), lo, hi);
+}
+
+// ─── CHECK ANSWER YES/NO (notas mode) ────────────────────────────────────────
+function checkAnswerYN(btn, given) {
+  if (answered) return;
+  answered = true;
+  const allBtns = document.querySelectorAll('.opt-btn');
+  allBtns.forEach(b => b.disabled = true);
+  const fb = document.getElementById('feedback');
+
+  if (given === currentAnswer) {
+    btn.classList.add('correct');
+    ok++; streak++;
+    const msgs = ['¡Exacto!', '¡Muy bien!', '¡Correcto!', '¡Perfecto!'];
+    fb.textContent = streak >= 3 ? `¡Racha de ${streak}! 🔥` : msgs[Math.floor(Math.random()*msgs.length)];
+    if (currentAnswer === 'no') fb.textContent += ` Es ${window._notaCorrecta}`;
+    fb.className = 'feedback ok';
+  } else {
+    btn.classList.add('wrong');
+    err++; streak = 0;
+    // highlight correct button
+    allBtns.forEach(b => {
+      if ((currentAnswer === 'si' && b.textContent === 'Sí') ||
+          (currentAnswer === 'no' && b.textContent === 'No')) {
+        b.classList.add('correct');
+      }
+    });
+    fb.textContent = currentAnswer === 'si'
+      ? `Era sí — es ${window._notaCorrecta}`
+      : `Era no — es ${window._notaCorrecta}`;
+    fb.className = 'feedback fail';
+  }
+
+  updateScore();
+  const card = document.querySelector('.exercise-card');
+  const nb = document.createElement('button');
+  nb.className = 'next-btn';
+  nb.textContent = 'Siguiente →';
+  nb.onclick = render;
+  card.appendChild(nb);
+}
+
+function checkAnswerBtn(btn) {
+  checkAnswer(btn, btn.dataset.label, btn.dataset.correct);
+}
+
+// ─── CHECK ANSWER ─────────────────────────────────────────────────────────────
+function checkAnswer(btn, given, correct) {
+  if (answered) return;
+  answered = true;
+
+  const allBtns = document.querySelectorAll('.opt-btn');
+  allBtns.forEach(b => b.disabled = true);
+
+  const fb = document.getElementById('feedback');
+
+  if (given === correct) {
+    btn.classList.add('correct');
+    ok++; streak++;
+    fb.textContent = 'Sí';
+    fb.className = 'feedback ok';
+    // play the correct note if we know its pitch
+    if (NOTE_TO_PITCH[correct]) playNote(correct);
+  } else {
+    btn.classList.add('wrong');
+    err++; streak = 0;
+    allBtns.forEach(b => {
+      if (b.dataset.label === correct || b.dataset.correct === correct && b.dataset.label === correct) {
+        b.classList.add('correct');
+      }
+      // en intervalos los botones no tienen data-label, marcar por textContent
+      if (mode === 'intervalos' && b.textContent === correct) {
+        b.classList.add('correct');
+      }
+    });
+    fb.textContent = 'No';
+    fb.className = 'feedback fail';
+  }
+
+  updateScore();
+
+  const card = document.querySelector('.exercise-card');
+
+  // Botón "¿Por qué?" solo en intervalos y solo si erró
+  if (mode === 'intervalos' && given !== correct) {
+    const wb = document.createElement('button');
+    wb.className = 'play-btn';
+    wb.style.cssText = 'display:block;margin:0.8rem auto 0;font-size:0.72rem;background:#2e5c8b;';
+    wb.textContent = '¿Por qué es ' + correct + '?';
+    wb.onclick = () => {
+      wb.style.display = 'none';
+      const exp = document.createElement('div');
+      exp.style.cssText = 'margin:0.8rem 0 0.5rem;padding:0.8rem 1rem;background:#f0f4fa;border-left:3px solid #2e5c8b;font-size:0.78rem;line-height:1.6;font-family:"Space Mono",monospace;color:#1a1208;';
+      exp.innerHTML = buildIntervalExplanation(correct);
+      card.insertBefore(exp, card.querySelector('.next-btn'));
+    };
+    card.appendChild(wb);
+  }
+
+  // Add next button
+  const nb = document.createElement('button');
+  nb.className = 'next-btn';
+  nb.textContent = 'Siguiente →';
+  nb.onclick = render;
+  card.appendChild(nb);
+}
+
+// ─── EXPLICACIÓN DE INTERVALOS ───────────────────────────────────────────────
+const INTERVAL_EXPLANATIONS = {
+  'Unísono justo':      'Misma nota, 0 semitonos.',
+  'Unísono aumentado':  'Misma nota con alteración que la sube 1 semitono.',
+  'Segunda disminuida': '2 notas distintas, 0 semitonos (enarmónico del unísono).',
+  'Segunda menor':      '2 notas contiguas, 1 semitono. Ej: Mi→Fa, Si→Do.',
+  'Segunda mayor':      '2 notas contiguas, 2 semitonos. Ej: Do→Re, Re→Mi.',
+  'Segunda aumentada':  '2 notas contiguas, 3 semitonos. Aparece en escala menor armónica. Ej: Fa→Sol♯.',
+  'Tercera disminuida': '3ª con 2 semitonos. Enarmónico de la 2ª mayor.',
+  'Tercera menor':      '3 notas, 3 semitonos. Ej: Re→Fa, Mi→Sol, La→Do.',
+  'Tercera mayor':      '3 notas, 4 semitonos. Ej: Do→Mi, Fa→La, Sol→Si.',
+  'Tercera aumentada':  '3 notas, 5 semitonos. Enarmónico de la 4ª justa.',
+  'Cuarta disminuida':  '4 notas, 4 semitonos. Enarmónico de la 3ª mayor.',
+  'Cuarta justa':       '4 notas, 5 semitonos. Ej: Do→Fa, Sol→Do.',
+  'Cuarta aumentada':   '4 notas, 6 semitonos. El tritono. Ej: Fa→Si.',
+  'Quinta disminuida':  '5 notas, 6 semitonos. El tritono invertido. Ej: Si→Fa.',
+  'Quinta justa':       '5 notas, 7 semitonos. Ej: Do→Sol, Re→La.',
+  'Quinta aumentada':   '5 notas, 8 semitonos. Aparece en escala mayor aumentada.',
+  'Sexta disminuida':   '6 notas, 7 semitonos. Enarmónico de la 5ª justa.',
+  'Sexta menor':        '6 notas, 8 semitonos. Ej: Mi→Do, La→Fa.',
+  'Sexta mayor':        '6 notas, 9 semitonos. Ej: Do→La, Re→Si.',
+  'Sexta aumentada':    '6 notas, 10 semitonos. Acorde de 6ª aumentada en armonía tonal.',
+  'Séptima disminuida': '7 notas, 9 semitonos. Ej: Si♯→La (enarmónico de la 6ª mayor).',
+  'Séptima menor':      '7 notas, 10 semitonos. Ej: Sol→Fa, Re→Do.',
+  'Séptima mayor':      '7 notas, 11 semitonos. Ej: Do→Si, Fa→Mi.',
+  'Octava justa':       '8 notas, 12 semitonos. La misma nota una octava más aguda.',
+};
+
+function buildIntervalExplanation(name) {
+  const base = INTERVAL_EXPLANATIONS[name] || '';
+  // Buscar en la tabla cuántos semitonos tiene
+  const entry = Object.entries(INTERVAL_TABLE).find(([,v]) => v === name);
+  let semis = '';
+  if (entry) {
+    const parts = entry[0].split(',');
+    semis = parts[1];
+  }
+  return `<strong>${name}</strong><br>${base}`;
+}
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────────
+// NOTE: nbrosowsky saxophone samples are labeled one octave LOW
+// e.g. D4.mp3 actually sounds as D5 — so we request one octave lower than we want
+const NOTE_TO_PITCH = {
+  'Do₄':'C3','Re₄':'D3','Mi₄':'E3','Fa₄':'F3','Sol₄':'G3','La₄':'A3','Si₄':'B3',
+  'Do₅':'C4','Re₅':'D4','Mi₅':'E4','Fa₅':'F4','Sol₅':'G4','La₅':'A4','Si₅':'B4',
+  'Do₆':'C5',
+};
+
+let sampler = null;
+let samplerReady = false;
+
+function initSampler() {
+  if (sampler) return;
+
+  const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.35 }).toDestination();
+  const vol = new Tone.Volume(-4).connect(reverb);
+
+  sampler = new Tone.Sampler({
+    urls: {
+      'C3': 'C3.mp3',
+      'D3': 'D3.mp3',
+      'G3': 'G3.mp3',
+      'C4': 'C4.mp3',
+      'D4': 'D4.mp3',
+      'G4': 'G4.mp3',
+      'B4': 'B4.mp3',
+      'C5': 'C5.mp3',
+    },
+    baseUrl: 'https://nbrosowsky.github.io/tonejs-instruments/samples/saxophone/',
+    onload: () => { samplerReady = true; },
+    onerror: () => {
+      const fallback = new Tone.Synth({
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.6, release: 1.2 }
+      }).connect(vol);
+      sampler = fallback;
+      samplerReady = true;
+    }
+  }).connect(vol);
+}
+
+async function playNote(label) {
+  await Tone.start();
+  if (!sampler) initSampler();
+  const pitch = NOTE_TO_PITCH[label];
+  if (!pitch) return;
+  const fire = () => {
+    try { sampler.triggerAttackRelease(pitch, '2n'); } catch(e) {}
+  };
+  if (samplerReady) fire();
+  else setTimeout(() => { if (samplerReady) fire(); }, 1000);
+}
+
+// ─── SOLFEO: AUDIO CTX ───────────────────────────────────────────────────────
+let solAudioCtx = null;
+function getSolAudio() {
+  if (!solAudioCtx) solAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return solAudioCtx;
+}
+function solBeep(freq, dur, vol, delay) {
+  const ctx = getSolAudio(), o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination); o.frequency.value = freq; o.type = 'sine';
+  const t = ctx.currentTime + (delay || 0);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol || 0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function solSaxNote(freq, dur, vol, delay) {
+  const ctx = getSolAudio();
+  const t = ctx.currentTime + (delay || 0);
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  master.gain.setValueAtTime(0, t);
+  master.gain.linearRampToValueAtTime(vol || 0.4, t + 0.045);
+  master.gain.setValueAtTime(vol || 0.4, t + dur * 0.65);
+  master.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  [{m:1,g:0.5},{m:2,g:0.28},{m:3,g:0.16},{m:4,g:0.09},{m:5,g:0.05}].forEach(h => {
+    const o = ctx.createOscillator(), g2 = ctx.createGain();
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.value = freq * h.m * 1.08; filt.Q.value = 3.5;
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(freq * h.m, t);
+    const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+    lfo.frequency.value = 5.5; lfoG.gain.value = freq * 0.011;
+    lfo.connect(lfoG); lfoG.connect(o.frequency);
+    g2.gain.value = h.g;
+    o.connect(filt); filt.connect(g2); g2.connect(master);
+    lfo.start(t); lfo.stop(t + dur + 0.1);
+    o.start(t); o.stop(t + dur + 0.1);
+  });
+}
+function solSaxFail() {
+  const ctx = getSolAudio(), t = ctx.currentTime;
+  const master = ctx.createGain(); master.connect(ctx.destination);
+  master.gain.setValueAtTime(0,t); master.gain.linearRampToValueAtTime(0.38,t+0.02);
+  master.gain.setValueAtTime(0.38,t+0.18); master.gain.exponentialRampToValueAtTime(0.001,t+0.55);
+  const baseFreq = 116;
+  const o1=ctx.createOscillator(); o1.type='sawtooth'; o1.frequency.setValueAtTime(baseFreq,t); o1.frequency.linearRampToValueAtTime(baseFreq*0.82,t+0.55);
+  const o2=ctx.createOscillator(); o2.type='sawtooth'; o2.frequency.setValueAtTime(baseFreq*1.015,t); o2.frequency.linearRampToValueAtTime(baseFreq*0.79,t+0.55);
+  const ws=ctx.createWaveShaper(); const curve=new Float32Array(256);
+  for(let i=0;i<256;i++){const x=i*2/255-1;curve[i]=x<0?-Math.pow(-x,0.4):Math.pow(x,0.4);}
+  ws.curve=curve; ws.oversample='4x';
+  const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=520; bp.Q.value=1.8;
+  const g1=ctx.createGain(),g2=ctx.createGain(); g1.gain.value=0.5; g2.gain.value=0.45;
+  o1.connect(g1); o2.connect(g2); g1.connect(ws); g2.connect(ws); ws.connect(bp); bp.connect(master);
+  o1.start(t); o1.stop(t+0.6); o2.start(t); o2.stop(t+0.6);
+}
+function beepPercusion(strong, delay) {
+  const ctx = getSolAudio(), t = ctx.currentTime + delay;
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.08), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.018));
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const f = ctx.createBiquadFilter(); f.type = strong ? 'bandpass' : 'lowpass'; f.frequency.value = strong ? 800 : 400; f.Q.value = 2;
+  const g = ctx.createGain(); g.gain.setValueAtTime(strong ? 0.65 : 0.38, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  src.connect(f); f.connect(g); g.connect(ctx.destination); src.start(t); src.stop(t + 0.1);
+}
+
+// ─── RITMO ───────────────────────────────────────────────────────────────────
+const SOL_FIGURAS = [
+  { name:'Redonda',     symbol:'𝅝',  desc:'4 tiempos — un sonido largo y sostenido', beats:[1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], pulses:16 },
+  { name:'Blanca',      symbol:'𝅗𝅥', desc:'2 tiempos — suena y se sostiene',         beats:[1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0], pulses:16 },
+  { name:'Negra',       symbol:'♩',  desc:'1 tiempo — el pulso básico',              beats:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0], pulses:16 },
+  { name:'Corchea',     symbol:'♪',  desc:'½ tiempo — dos por cada tiempo',          beats:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], pulses:16 },
+  { name:'Semicorchea', symbol:'𝅘𝅥𝅯', desc:'¼ tiempo — cuatro por cada tiempo',       beats:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], pulses:16 },
+];
+let solCurrentFigura = null, solFiguraAnswered = false, solFiguraPlaying = false, solFiguraTimeout = null;
+let solMetronomeOn = false, solMetronomeInterval = null, solMetroBeat = 0;
+
+function renderRitmo() {
+  answered = true;
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="solfeo-card">
+      <div class="clef-badge">Ritmo</div>
+      <div class="solfeo-title">¿Qué ritmo escuchás?</div>
+      <div class="tempo-row">
+        <label>Tempo</label>
+        <input type="range" min="50" max="120" value="72" id="solTempoSlider" oninput="solUpdateTempo()">
+        <span class="tempo-val" id="solTempoDisp">72 BPM</span>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <button class="play-btn" id="solMetroBtn" onclick="solToggleMetronome()" style="display:inline-flex;align-items:center;gap:6px;">
+          <span id="solMetroIndicator" style="width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,0.4);display:inline-block;transition:all 0.1s;"></span>
+          Metrónomo
+        </button>
+      </div>
+      <div id="solPulseGrid" class="pulse-grid"></div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+        <button class="play-btn" id="solPlayBtn" onclick="solPlayFigura()">▶ Escuchar</button>
+        <button class="play-btn" onclick="solPlayFigura()" style="background:var(--accent2);">↺ Repetir</button>
+      </div>
+      <div class="solfeo-choices" id="solRitmoChoices"></div>
+      <div class="feedback" id="solRitmoFeedback"></div>
+      <button class="next-btn" id="solRitmoNext" style="display:none;" onclick="solLoadFigura()">Siguiente →</button>
+    </div>
+    <div class="hint-box-solfeo">
+      <strong>Figuras rítmicas</strong><br>
+      Redonda: 4 tiempos · Blanca: 2 · Negra: 1 · Corchea: ½ · Semicorchea: ¼
+    </div>
+  `;
+  updateScore();
+  solLoadFigura();
+}
+
+function solRenderPulseGrid() {
+  const cont = document.getElementById('solPulseGrid'); if (!cont) return;
+  cont.innerHTML = '';
+  for (let i = 0; i < 16; i++) {
+    const d = document.createElement('div'); d.id = 'spulse-' + i; d.className = 'pulse-dot'; cont.appendChild(d);
+  }
+}
+
+function solLoadFigura() {
+  solFiguraAnswered = false;
+  const pool = SOL_FIGURAS.filter(f => f !== solCurrentFigura);
+  solCurrentFigura = pool[Math.floor(Math.random() * pool.length)];
+  solRenderPulseGrid();
+  // Mostrar siempre las 5 figuras como opciones, en orden aleatorio
+  const choices = [...SOL_FIGURAS].sort(() => Math.random() - 0.5);
+  const cont = document.getElementById('solRitmoChoices'); if (!cont) return;
+  cont.innerHTML = '';
+  choices.forEach(fig => {
+    const b = document.createElement('button'); b.className = 'solfeo-choice-btn';
+    b.innerHTML = '<span style="font-size:1.2rem;margin-right:6px;">' + fig.symbol + '</span>' + fig.name;
+    b.onclick = () => solCheckFigura(fig.name, b); cont.appendChild(b);
+  });
+  const fb = document.getElementById('solRitmoFeedback'); if (fb) { fb.textContent = ''; fb.className = 'feedback'; }
+  const nb = document.getElementById('solRitmoNext'); if (nb) nb.style.display = 'none';
+  const pb = document.getElementById('solPlayBtn'); if (pb) pb.textContent = '▶ Escuchar';
+}
+
+function solPlayFiguraPattern(figura, onDone) {
+  if (solFiguraPlaying) { clearTimeout(solFiguraTimeout); solFiguraPlaying = false; }
+  const bpm = parseInt(document.getElementById('solTempoSlider')?.value || 72);
+  const pulseMs = (60000 / bpm) / 4;
+  solFiguraPlaying = true; let i = 0;
+  function tick() {
+    if (!solFiguraPlaying) return;
+    if (i >= figura.pulses) {
+      solFiguraPlaying = false;
+      for (let j = 0; j < 16; j++) { const d = document.getElementById('spulse-' + j); if (d) { d.style.background = 'rgba(26,18,8,0.08)'; d.style.transform = 'scale(1)'; } }
+      if (onDone) onDone(); return;
+    }
+    if (i > 0) { const prev = document.getElementById('spulse-' + (i - 1)); if (prev) { prev.style.background = 'rgba(26,18,8,0.08)'; prev.style.transform = 'scale(1)'; } }
+    const dot = document.getElementById('spulse-' + i);
+    if (dot) {
+      if (figura.beats[i]) { dot.style.background = 'var(--ink)'; dot.style.transform = 'scale(1.4)'; setTimeout(() => { if (dot) dot.style.transform = 'scale(1)'; }, pulseMs * 0.35); beepPercusion(i % 4 === 0, 0); }
+      else { dot.style.background = 'rgba(26,18,8,0.04)'; }
+    }
+    i++; solFiguraTimeout = setTimeout(tick, pulseMs);
+  }
+  tick();
+}
+
+function solPlayFigura() {
+  if (!solCurrentFigura) return;
+  const pb = document.getElementById('solPlayBtn'); if (pb) pb.textContent = '⏸ Sonando…';
+  solPlayFiguraPattern(solCurrentFigura, () => { const pb2 = document.getElementById('solPlayBtn'); if (pb2) pb2.textContent = '▶ Escuchar'; });
+}
+
+function solCheckFigura(answer, btn) {
+  if (solFiguraAnswered) return;
+  solFiguraAnswered = true;
+  const correct = solCurrentFigura.name;
+  document.querySelectorAll('#solRitmoChoices .solfeo-choice-btn').forEach(b => b.disabled = true);
+  const fb = document.getElementById('solRitmoFeedback');
+  if (answer === correct) {
+    ok++; streak++; btn.classList.add('correct');
+    if (fb) { fb.textContent = '¡Correcto! ' + correct + ' — ' + solCurrentFigura.desc; fb.className = 'feedback ok'; }
+    solBeep(440, 0.15, 0.2);
+  } else {
+    err++; streak = 0; btn.classList.add('wrong');
+    document.querySelectorAll('#solRitmoChoices .solfeo-choice-btn').forEach(b => { if (b.textContent.includes(correct)) b.classList.add('correct'); });
+    if (fb) { fb.textContent = 'Era ' + correct + ' — ' + solCurrentFigura.desc; fb.className = 'feedback fail'; }
+    solSaxFail();
+    setTimeout(() => solPlayFiguraPattern(solCurrentFigura, null), 700);
+  }
+  updateScore();
+  const nb = document.getElementById('solRitmoNext'); if (nb) nb.style.display = 'block';
+}
+
+function solUpdateTempo() {
+  const val = document.getElementById('solTempoSlider')?.value;
+  const disp = document.getElementById('solTempoDisp'); if (disp) disp.textContent = val + ' BPM';
+  if (solMetronomeOn) { solStopMetronome(); solStartMetronome(); }
+}
+function beepMetro(strong) {
+  const ctx = getSolAudio(), t = ctx.currentTime;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination); o.type = 'triangle';
+  o.frequency.value = strong ? 1200 : 900;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(strong ? 0.45 : 0.28, t + 0.004); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  o.start(t); o.stop(t + 0.07);
+}
+function solStartMetronome() {
+  const bpm = parseInt(document.getElementById('solTempoSlider')?.value || 72);
+  const ms = 60000 / bpm; solMetroBeat = 0; beepMetro(true); solSetIndicator(true);
+  solMetronomeInterval = setInterval(() => { solMetroBeat = (solMetroBeat + 1) % 4; beepMetro(solMetroBeat === 0); solSetIndicator(solMetroBeat === 0); }, ms);
+}
+function solStopMetronome() { clearInterval(solMetronomeInterval); solMetronomeInterval = null; solSetIndicator(false); solMetroBeat = 0; }
+function solSetIndicator(strong) {
+  const ind = document.getElementById('solMetroIndicator'); if (!ind) return;
+  if (!solMetronomeOn) { ind.style.background = 'rgba(255,255,255,0.3)'; return; }
+  ind.style.background = strong ? 'white' : 'rgba(255,255,255,0.5)';
+  ind.style.transform = strong ? 'scale(1.5)' : 'scale(1)';
+  if (strong) setTimeout(() => { if (ind) ind.style.transform = 'scale(1)'; }, 80);
+}
+function solToggleMetronome() {
+  const btn = document.getElementById('solMetroBtn');
+  if (solMetronomeOn) { solMetronomeOn = false; solStopMetronome(); if (btn) { btn.style.opacity = '1'; } }
+  else { solMetronomeOn = true; solStartMetronome(); if (btn) { btn.style.opacity = '1'; } }
+}
+
+// ─── ENTONACIÓN ──────────────────────────────────────────────────────────────
+const SOL_INTERVALS = [
+  { note:'Do',  hint:'Nota base',      freq:261.63 },
+  { note:'Re',  hint:'Segunda mayor',  freq:293.66 },
+  { note:'Mi',  hint:'Tercera mayor',  freq:329.63 },
+  { note:'Fa',  hint:'Cuarta justa',   freq:349.23 },
+  { note:'Sol', hint:'Quinta justa',   freq:392.00 },
+  { note:'La',  hint:'Sexta mayor',    freq:440.00 },
+  { note:'Si',  hint:'Séptima mayor',  freq:493.88 },
+];
+let solCurrentInterval = 0;
+
+function renderEntonacion() {
+  answered = true;
+  const iv = SOL_INTERVALS[solCurrentInterval];
+  document.getElementById('exerciseArea').innerHTML = `
+    <div style="font-family:'Space Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;opacity:0.7;margin-bottom:0.8rem;text-align:center;">
+      Acompañá con tu voz los sonidos que escuchás
+    </div>
+    <div class="big-note-display">
+      <div class="note-name" id="entNoteName">${iv.note === 'Do' ? 'Do' : 'Do — ' + iv.note}</div>
+      <div class="note-hint" id="entNoteHint">${iv.hint}</div>
+    </div>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1.2rem;">
+      <button class="play-btn" onclick="solPlayNote()">▶ Nota</button>
+      <button class="play-btn" onclick="solPlayScale()" style="background:var(--accent2);">▶ Escala</button>
+      <button class="next-btn" style="display:inline-block;margin:0;" onclick="solNextInterval()">Siguiente →</button>
+    </div>
+    <div class="exercise-card" style="padding:1rem 1.2rem;">
+      <div id="entIntervalInfo" style="font-family:'Space Mono',monospace;font-size:0.8rem;line-height:1.7;"></div>
+      <div id="entScaleDisplay" style="margin-top:0.8rem;min-height:1.5rem;font-family:'Libre Baskerville',serif;font-size:1rem;"></div>
+    </div>
+  `;
+  solLoadInterval();
+}
+
+function solLoadInterval() {
+  const iv = SOL_INTERVALS[solCurrentInterval];
+  const el = document.getElementById('entNoteName'); if (el) el.textContent = iv.note === 'Do' ? 'Do' : 'Do — ' + iv.note;
+  const eh = document.getElementById('entNoteHint'); if (eh) eh.textContent = iv.hint;
+  const ei = document.getElementById('entIntervalInfo'); if (ei) ei.innerHTML = '<strong style="color:var(--accent);">' + iv.note + '</strong> — ' + iv.hint;
+  const sd = document.getElementById('entScaleDisplay'); if (sd) sd.innerHTML = '';
+}
+function solPlayNote() {
+  solSaxNote(261.63, 0.35, 0.32);
+  setTimeout(() => solSaxNote(SOL_INTERVALS[solCurrentInterval].freq, 0.75, 0.36), 420);
+}
+function solPlayScale() {
+  const FREQS_HIGH = [523.25,587.33,659.25,698.46,783.99,880.00,987.77];
+  const startIdx = solCurrentInterval;
+  const notes = [];
+  for (let i = 0; i < 7; i++) {
+    const idx = (startIdx + i) % 7;
+    const octaveUp = (startIdx + i) >= 7;
+    notes.push({ note: SOL_INTERVALS[idx].note, freq: octaveUp ? FREQS_HIGH[idx] : SOL_INTERVALS[idx].freq });
+  }
+  const disp = document.getElementById('entScaleDisplay'); if (disp) disp.innerHTML = '';
+  notes.forEach((iv, i) => {
+    setTimeout(() => {
+      solSaxNote(iv.freq, 0.42, 0.32);
+      if (disp) {
+        const span = document.createElement('span');
+        span.textContent = iv.note + (i < 6 ? ' — ' : '');
+        span.style.cssText = 'opacity:0;transition:opacity 0.2s;';
+        disp.appendChild(span);
+        setTimeout(() => span.style.opacity = '1', 30);
+      }
+    }, i * 420);
+  });
+}
+function solNextInterval() {
+  solCurrentInterval = (solCurrentInterval + 1) % SOL_INTERVALS.length;
+  renderEntonacion();
+}
+
+// ─── DICTADO ─────────────────────────────────────────────────────────────────
+const SOL_DICT_NOTES = ['Do','Re','Mi','Fa','Sol','La','Si'];
+const SOL_DICT_FREQS = {Do:261.63,Re:293.66,Mi:329.63,Fa:349.23,Sol:392.00,La:440.00,Si:493.88};
+const SOL_DICT_LEVELS = [2,3,4,5,6,7];
+const SOL_ROUND_SIZE = 5;
+let solDictLevel = 0, solDictMelody = [], solUserAnswer = [], solDictAnswered = false;
+let solEditingSlot = -1, solLockedCorrect = [], solMelodyTimeouts = [];
+let solDictCorrect = 0, solDictTotal = 0, solRoundResults = [];
+
+function renderDictado() {
+  answered = true;
+  document.getElementById('exerciseArea').innerHTML = `
+    <div class="solfeo-card">
+      <div class="clef-badge">Dictado</div>
+      <div class="solfeo-title">¿Qué secuencia de notas escuchás?</div>
+      <div class="level-row" id="solLevelRow"></div>
+      <div class="progress-dots" id="solDictDots"></div>
+      <div class="melody-slots" id="solMelodySlots"></div>
+      <div class="kbd" id="solNoteKbd"></div>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem;">
+        <button class="play-btn" onclick="solPlayMelody()">▶ Escuchar</button>
+        <button class="play-btn" id="solCheckBtn" onclick="solCheckDictado()" style="display:none;background:var(--correct);">Verificar</button>
+        <button class="play-btn" onclick="solNewDictado()" style="background:var(--accent2);">Cambiar melodía</button>
+        <button class="play-btn" onclick="solDeleteLast()" style="background:#888;">← Borrar</button>
+      </div>
+      <div class="feedback" id="solDictFeedback"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.65rem;opacity:0.5;margin-top:0.5rem;min-height:1rem;" id="solDictHint"></div>
+    </div>
+    <div class="hint-box-solfeo"><strong>Sugerencia</strong><br>Escuchá la melodía completa primero. Tararéala. Luego identificá cada nota. Sin límite de reproducciones.</div>
+  `;
+  updateScore();
+  solRenderLevelRow();
+  solNewDictadoSilent();
+}
+
+function solRenderLevelRow() {
+  const cont = document.getElementById('solLevelRow'); if (!cont) return;
+  cont.innerHTML = '';
+  SOL_DICT_LEVELS.forEach((l, i) => {
+    const b = document.createElement('button'); b.className = 'level-btn' + (i === solDictLevel ? ' active' : '');
+    b.textContent = l + ' notas';
+    b.onclick = () => { solDictLevel = i; solRenderLevelRow(); solNewDictado(); };
+    cont.appendChild(b);
+  });
+}
+
+function solGenMelody() {
+  const len = SOL_DICT_LEVELS[solDictLevel], m = [];
+  for (let i = 0; i < len; i++) m.push(SOL_DICT_NOTES[Math.floor(Math.random() * SOL_DICT_NOTES.length)]);
+  return m;
+}
+
+function solNewDictadoSilent() {
+  solDictMelody = solGenMelody(); solUserAnswer = []; solDictAnswered = false;
+  solEditingSlot = -1; solLockedCorrect = [];
+  solMelodyTimeouts.forEach(t => clearTimeout(t)); solMelodyTimeouts = [];
+  const fb = document.getElementById('solDictFeedback'); if (fb) { fb.textContent = ''; fb.className = 'feedback'; }
+  const hi = document.getElementById('solDictHint'); if (hi) hi.textContent = '';
+  const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = 'none';
+  solRenderSlots(); solRenderKbd(); solRenderDots();
+}
+
+function solNewDictado() {
+  solNewDictadoSilent();
+  setTimeout(() => solPlayMelody(), 350);
+}
+
+function solPlayMelody() {
+  solMelodyTimeouts.forEach(t => clearTimeout(t)); solMelodyTimeouts = [];
+  const gap = solDictMelody.length >= 6 ? 630 : 520;
+  solDictMelody.forEach((n, i) => {
+    const t = setTimeout(() => solSaxNote(SOL_DICT_FREQS[n], 0.45, 0.32), i * gap);
+    solMelodyTimeouts.push(t);
+  });
+}
+
+function solRenderSlots() {
+  const cont = document.getElementById('solMelodySlots'); if (!cont) return;
+  cont.innerHTML = '';
+  solDictMelody.forEach((_, i) => {
+    const s = document.createElement('div'); s.id = 'sslot-' + i;
+    if (solLockedCorrect.includes(i)) {
+      s.className = 'note-slot correct-slot'; s.textContent = (solUserAnswer[i] || '').trim(); s.style.cursor = 'default';
+    } else if (i === solEditingSlot) {
+      s.className = 'note-slot active-slot'; s.textContent = (solUserAnswer[i] || '').trim(); s.style.cursor = 'pointer';
+      s.onclick = (() => { const k = i; return () => solSelectSlot(k); })();
+    } else if (solUserAnswer[i]) {
+      s.className = 'note-slot filled'; s.textContent = solUserAnswer[i].trim(); s.style.cursor = 'pointer';
+      s.onclick = (() => { const k = i; return () => solSelectSlot(k); })();
+    } else {
+      const nextEmpty = solDictMelody.findIndex((_, j) => !solUserAnswer[j] && !solLockedCorrect.includes(j));
+      s.className = (i === nextEmpty && solEditingSlot === -1) ? 'note-slot active-slot' : 'note-slot';
+    }
+    cont.appendChild(s);
+  });
+}
+
+function solSelectSlot(i) { if (solLockedCorrect.includes(i)) return; solEditingSlot = i; solRenderSlots(); }
+
+function solRenderKbd() {
+  const cont = document.getElementById('solNoteKbd'); if (!cont) return;
+  cont.innerHTML = '';
+  SOL_DICT_NOTES.forEach(n => {
+    const b = document.createElement('button'); b.className = 'kbd-btn'; b.textContent = n;
+    b.onclick = () => solAddNote(n); cont.appendChild(b);
+  });
+}
+
+function solAddNote(note) {
+  if (solDictAnswered) return;
+  solSaxNote(SOL_DICT_FREQS[note], 0.32, 0.3);
+  if (solEditingSlot >= 0 && solEditingSlot < solDictMelody.length) {
+    solUserAnswer[solEditingSlot] = note.trim(); solEditingSlot = -1;
+  } else {
+    const next = solDictMelody.findIndex((_, j) => !solUserAnswer[j] && !solLockedCorrect.includes(j));
+    if (next === -1) return; solUserAnswer[next] = note.trim();
+  }
+  solRenderSlots();
+  const filled = solUserAnswer.filter(n => n).length + solLockedCorrect.length;
+  const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = filled >= solDictMelody.length ? 'inline-block' : 'none';
+}
+
+function solDeleteLast() {
+  if (solDictAnswered) return;
+  if (solEditingSlot >= 0 && !solLockedCorrect.includes(solEditingSlot)) {
+    solUserAnswer[solEditingSlot] = null; solEditingSlot = -1; solRenderSlots();
+    const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = 'none'; return;
+  }
+  let last = -1;
+  for (let i = solDictMelody.length - 1; i >= 0; i--) { if (solUserAnswer[i] && !solLockedCorrect.includes(i)) { last = i; break; } }
+  if (last >= 0) { solUserAnswer[last] = null; solRenderSlots(); const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = 'none'; }
+}
+
+function solCheckDictado() {
+  if (solDictAnswered) return;
+  const filled = solUserAnswer.filter(n => n).length + solLockedCorrect.length;
+  if (filled < solDictMelody.length) return;
+  let allCorrect = true; let firstWrong = -1;
+  solDictMelody.forEach((note, i) => {
+    if (solLockedCorrect.includes(i)) return;
+    const ans = (solUserAnswer[i] || '').trim();
+    if (ans === note.trim()) { solLockedCorrect.push(i); } else { allCorrect = false; if (firstWrong === -1) firstWrong = i; }
+  });
+  solRenderSlots();
+  const fb = document.getElementById('solDictFeedback');
+  if (allCorrect) {
+    solDictAnswered = true; solDictTotal++; solDictCorrect++; ok++; streak++;
+    if (fb) { fb.textContent = '¡Perfecto! Melodía correcta ♫'; fb.className = 'feedback ok'; }
+    const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = 'none';
+    solBeep(440,0.1,0.2); setTimeout(()=>solBeep(523,0.1,0.2),120); setTimeout(()=>solBeep(659,0.3,0.2),240);
+    solRoundResults.push(true); solRenderDots();
+    if (solRoundResults.length >= SOL_ROUND_SIZE) {
+      setTimeout(() => {
+        const pct = Math.round(solRoundResults.filter(Boolean).length / SOL_ROUND_SIZE * 100);
+        const hi = document.getElementById('solDictHint'); if (hi) hi.textContent = 'Ronda terminada: ' + pct + '% de aciertos. ¡Nueva ronda!';
+        solRoundResults = []; solRenderDots();
+      }, 1500);
+    }
+  } else {
+    err++; streak = 0;
+    solDictMelody.forEach((note, i) => {
+      if (solLockedCorrect.includes(i)) return;
+      const s = document.getElementById('sslot-' + i); if (!s) return;
+      s.classList.remove('filled','active-slot'); s.classList.add('wrong-slot');
+      s.textContent = (solUserAnswer[i] || '').trim() || '?'; s.style.cursor = 'pointer';
+      s.onclick = (() => { const k = i; return () => solSelectSlot(k); })();
+    });
+    const wrong = solDictMelody.length - solLockedCorrect.length;
+    if (fb) { fb.textContent = 'Hay ' + wrong + ' nota' + (wrong > 1 ? 's' : '') + ' incorrecta' + (wrong > 1 ? 's' : '') + '. Tocá las rojas para corregirlas.'; fb.className = 'feedback fail'; }
+    solSaxFail(); setTimeout(() => solPlayMelody(), 700);
+    if (firstWrong >= 0) solSelectSlot(firstWrong);
+    const cb = document.getElementById('solCheckBtn'); if (cb) cb.style.display = 'inline-block';
+  }
+  updateScore();
+}
+
+function solRenderDots() {
+  const cont = document.getElementById('solDictDots'); if (!cont) return;
+  cont.innerHTML = '';
+  for (let i = 0; i < SOL_ROUND_SIZE; i++) {
+    const d = document.createElement('div'); d.className = 'prog-dot';
+    if (i < solRoundResults.length) d.classList.add(solRoundResults[i] ? 'done-ok' : 'done-fail');
+    else if (i === solRoundResults.length) d.classList.add('current');
+    cont.appendChild(d);
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
